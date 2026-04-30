@@ -10,6 +10,8 @@
 #include "../libs/emscripten/emscripten_mainloop_stub.h"
 #endif
 
+#include "UI/UIManager.h"
+
 // Main code
 int main(int, char**)
 {
@@ -27,7 +29,7 @@ int main(int, char**)
     SDL_WindowFlags window_flags =
         SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIDDEN | SDL_WINDOW_HIGH_PIXEL_DENSITY;
     SDL_Window* window = SDL_CreateWindow(
-        "RyzEd"
+        "RyzEd",
         (int)(1280 * main_scale), (int)(800 * main_scale), window_flags);
     if (window == nullptr)
     {
@@ -68,7 +70,7 @@ int main(int, char**)
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
     // Setup Dear ImGui style
-    ImGui::StyleColorsLight();
+    ImGui::StyleColorsDark();
 
     // Setup scaling
     ImGuiStyle& style = ImGui::GetStyle();
@@ -116,13 +118,12 @@ int main(int, char**)
     //ImFont* font = io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\ArialUni.ttf");
     //IM_ASSERT(font != nullptr);
 
-    // Our state
-    bool show_demo_window = true;
-    bool show_another_window = false;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
     // Main loop
     bool done = false;
+    UIManager* ryzUI = new UIManager(&io);
+
     while (!done)
     {
         // Poll and handle events (inputs, window resize, etc.)
@@ -162,50 +163,7 @@ int main(int, char**)
         ImGui_ImplSDL3_NewFrame();
         ImGui::NewFrame();
 
-        // 2. Show a simple window that we create ourselves. We use a Begin/End
-        // pair to create a named window.
-        {
-            static float f = 0.0f;
-            static int counter = 0;
-
-            // Create a window called "Hello, world!" and append into it.
-            ImGui::Begin("Hello, world!");                          
-
-            // Display some text (you can use a format strings too)
-            ImGui::Text("This is some useful text.");
-            // Edit bools storing our window open/close state           
-            ImGui::Checkbox("Demo Window", &show_demo_window);
-            ImGui::Checkbox("Another Window", &show_another_window);
-
-            // Edit 1 float using a slider from 0.0f to 1.0f
-            ImGui::SliderFloat("float", &f, 0.0f, 1.0f);
-            // Edit 3 floats representing a color
-            ImGui::ColorEdit3("clear color", (float*)&clear_color);
-
-            // Buttons return true when clicked
-            // (most widgets return true when edited/activated)
-            if (ImGui::Button("Button"))
-                counter++;
-            ImGui::SameLine();
-            ImGui::Text("counter = %d", counter);
-
-            ImGui::Text(
-                "Application average %.3f ms/frame (%.1f FPS)",
-                1000.0f / io.Framerate, io.Framerate);
-            ImGui::End();
-        }
-
-        // 3. Show another simple window.
-        if (show_another_window)
-        {
-            ImGui::Begin("Another Window", &show_another_window);
-            // Pass a pointer to our bool variable
-            // (the window will have a closing button that will clear the bool when clicked)
-            ImGui::Text("Hello from another window!");
-            if (ImGui::Button("Close Me"))
-                show_another_window = false;
-            ImGui::End();
-        }
+        ryzUI->Render();
 
         // Rendering
         ImGui::Render();
@@ -249,6 +207,8 @@ int main(int, char**)
         // Submit the command buffer
         SDL_SubmitGPUCommandBuffer(command_buffer);
     }
+
+    delete ryzUI;
 
     // Cleanup
     // [If using SDL_MAIN_USE_CALLBACKS: all code
