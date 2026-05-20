@@ -26,7 +26,10 @@ void UIManager::Render()
         nfdresult_t result = NFD_OpenDialogU8_With(&outPath, &args);
         if (result == NFD_OKAY)
         {
-            
+            if (this->landscapeFileSelCB != nullptr)
+            {
+                this->landscapeFileSelCB(outPath);
+            }
             NFD_FreePathU8(outPath);
         }
     }
@@ -35,4 +38,9 @@ void UIManager::Render()
         "Application average %.3f ms/frame (%.1f FPS)",
         1000.0f / this->io->Framerate, this->io->Framerate);
     ImGui::End();
+}
+
+void UIManager::RegisterLandscapeFileSelCB(std::function<void(const std::string& path)> cb)
+{
+    this->landscapeFileSelCB = cb;
 }

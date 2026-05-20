@@ -4,12 +4,15 @@
 #include <stdio.h>          // printf, fprintf
 #include <stdlib.h>         // abort
 #include <SDL3/SDL.h>
+#define SDL_GPU_SHADERCROSS_IMPLEMENTATION
+#include "SDL_gpu_shadercross.h"
 
 // This example doesn't compile with Emscripten yet! Awaiting SDL3 support.
 #ifdef __EMSCRIPTEN__
 #include "../libs/emscripten/emscripten_mainloop_stub.h"
 #endif
 
+#include "LandscapeEditor/LandscapeManager.h"
 #include "UI/UIManager.h"
 
 // Main code
@@ -41,10 +44,7 @@ int main(int, char**)
 
     // Create GPU Device
     SDL_GPUDevice* gpu_device = SDL_CreateGPUDevice(
-        SDL_GPU_SHADERFORMAT_SPIRV |
-        SDL_GPU_SHADERFORMAT_DXIL |
-        SDL_GPU_SHADERFORMAT_MSL |
-        SDL_GPU_SHADERFORMAT_METALLIB,
+        SDL_ShaderCross_GetSPIRVShaderFormats(),
         true, nullptr);
     if (gpu_device == nullptr)
     {
@@ -120,10 +120,23 @@ int main(int, char**)
 
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
-    // Main loop
+    NLMISC::CApplicationContext myApplicationContext;
+    NLLIGO::Register();
+    /*NLLIGO::CLigoConfig LigoConfig;
+    NLLIGO::CPrimitiveContext::instance().CurrentLigoConfig = &LigoConfig;
+    NLLIGO::CPrimitives primDoc;
+    NLLIGO::CPrimitiveContext::instance().CurrentPrimitive = &primDoc;
+    */
     bool done = false;
+    LandscapeManager* landscapeManager = new LandscapeManager("world_editor_classes.xml");
     UIManager* ryzUI = new UIManager(&io);
+    ryzUI->RegisterLandscapeFileSelCB([landscapeManager](const std::string& path)
+    {
+        landscapeManager->LoadLandscapePrimitive(path);
+    });
 
+    // Main loop
+    // Main loop
     while (!done)
     {
         // Poll and handle events (inputs, window resize, etc.)
@@ -209,6 +222,7 @@ int main(int, char**)
     }
 
     delete ryzUI;
+    delete landscapeManager;
 
     // Cleanup
     // [If using SDL_MAIN_USE_CALLBACKS: all code
