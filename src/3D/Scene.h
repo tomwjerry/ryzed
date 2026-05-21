@@ -23,4 +23,6 @@ private:
 
 public:
     void AddNode(Node* node);
+    void PrepareForRender(SDL_GPUDevice* device);
+    void Render(SDL_GPUDevice* device);
 };

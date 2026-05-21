@@ -9,7 +9,7 @@ void Scene::AddNode(Node* node)
     nodes.push_back(node);
 }
 
-void Scene::PrepareForRender()
+void Scene::PrepareForRender(SDL_GPUDevice* device)
 {
 
 }
