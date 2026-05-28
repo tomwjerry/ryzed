@@ -59,192 +59,10 @@ void LandscapeManager::Load(const std::string& path)
             this->parsePath(parseText);
             this->LoadZoneDir(parseText);
         }
-
-        /*
-        if (parseText.find("landscapePrimitive") != std::string::npos)
-        {
-            // Found the landscape section
-            // Include all after ":" until end of line or comma
-            this->parsePath(parseText);
-            this->editLandscapePrimitivePath = parseText;
-        }
-        else if (parseText.find("land") != std::string::npos)
-        {
-            this->parsePath(parseText);
-            this->editZoneRegionPath = parseText;
-        }*/
     }
 
     // Close the file
     file.close();
-
-       if (!args.parse(argc, argv))
-        {
-            args.displayHelp();
-            return EXIT_FAILURE;
-        }
-
-        std::string inputFilePath = args.getAdditionalArg("input").front();
-        std::string zoneSearchDirectory = CFile::getPath(inputFilePath);
-        std::string bankFilePath = getLongArgFirstValue(args, "tile-bank");
-        std::string outputFilePath = args.getAdditionalArg("output").front();
-        std::string outputDirectory = CFile::getPath(outputFilePath);
-        std::string basename = CFile::getFilenameWithoutExtension(outputFilePath);
-        std::string positionFilename = basename + ".position.bin";
-        std::string positionFilePath = outputDirectory + "/" + positionFilename;
-        std::string normalFilename = basename + ".normal.bin";
-        std::string normalFilePath = outputDirectory + "/" + normalFilename;
-        std::string imageUriPrefix = getLongArgFirstValue(args, "image-prefix");
-        std::string imageFileExtension = getLongArgFirstValue(args, "image-extension");
-        bool useRelativePosition = args.haveLongArg("use-relative-position");
-
-        CIFile zoneFile;
-        if (!zoneFile.open(inputFilePath))
-        {
-            nlwarning("Can't open the file for reading: %s", inputFilePath.c_str());
-            return EXIT_FAILURE;
-        }
-        CLandscape landscape;
-        CAABBox bbox;
-        CZone loadingZone;
-        loadingZone.serial(zoneFile);
-        zoneFile.close();
-        const auto zoneId(loadingZone.getZoneId());
-        landscape.setNoiseMode(false);
-        // add neighbor zones to get the same border vertices
-        addNeighborZones(landscape, zoneId, zoneSearchDirectory);
-        auto zone = landscape.getZone(zoneId);
-        if (zone == nullptr)
-        {
-            nlerror("Can't finde zone with id: %i", zoneId);
-            return EXIT_FAILURE;
-        }
-        try
-        {
-            loadTileBank(landscape, bankFilePath);
-        }
-        catch (const Exception &)
-        {
-            nlerror("Can't load bankfile: %s", bankFilePath.c_str());
-            return EXIT_FAILURE;
-        }
-        COFile outputPosition;
-        if (!outputPosition.open(positionFilePath, false, false, false))
-        {
-            nlwarning("Can't open the file for writing: %s", positionFilePath.c_str());
-            return EXIT_FAILURE;
-        }
-        COFile outputNormal;
-        if (!outputNormal.open(normalFilePath, false, false, false))
-        {
-            nlwarning("Can't open the file for writing: %s", normalFilePath.c_str());
-            return EXIT_FAILURE;
-        }
-        COFile texCoord0Output;
-        auto textCoord0Filename = openFile(texCoord0Output, outputDirectory, basename, ".texcoord_0.bin");
-        if (!textCoord0Filename)
-        {
-            return EXIT_FAILURE;
-        }
-        COFile texCoord1Output;
-        auto texCoord1Filename = openFile(texCoord1Output, outputDirectory, basename, ".texcoord_1.bin");
-        if (!texCoord1Filename)
-        {
-            return EXIT_FAILURE;
-        }
-
-        const sint zoneX(zoneId & 255);
-        const sint zoneY(zoneId >> 8);
-        CVector zoneOffset(160.0f * zoneX, -160.0f * zoneY, 0.0f);
-        gltf::Mesh mesh = { .name = zoneName(zoneX, zoneY) };
-        gltf::Node node = { .name = mesh.name, .mesh = 0, .translation = { zoneOffset.x, zoneOffset.y, zoneOffset.z } };
-        if (useRelativePosition)
-        {
-            node.translation.clear();
-        }
-        gltf::Asset asset = {
-            .nodes = { node },
-            .scenes = { { .nodes = { 0 } } }
-        };
-        OutputData output;
-        QImage normalMap = createNormalMap(NORMAL_MAP_SIZE, NORMAL_MAP_SIZE);
-        QImage tileIdMaps[TILE_LAYER_COUNT] = {
-            createTileIdMap(TILE_ID_MAP_SIZE, TILE_ID_MAP_SIZE),
-            createTileIdMap(TILE_ID_MAP_SIZE, TILE_ID_MAP_SIZE),
-            createTileIdMap(TILE_ID_MAP_SIZE, TILE_ID_MAP_SIZE)
-        };
-        for (sint patchIndex = 0; patchIndex < zone->getNumPatchs(); patchIndex++)
-        {
-            buildFaces(landscape, zoneId, patchIndex, output, tileIdMaps, normalMap);
-        }
-        tileIdMaps[0].save(QString::fromStdString(outputDirectory + "/" + basename + ".tile-id-0.png"));
-        tileIdMaps[1].save(QString::fromStdString(outputDirectory + "/" + basename + ".tile-id-1.png"));
-        tileIdMaps[2].save(QString::fromStdString(outputDirectory + "/" + basename + ".tile-id-2.png"));
-        normalMap.save(QString::fromStdString(outputDirectory + "/" + basename + ".normal.png"));
-        for (auto &vertex : output.vertices)
-        {
-            vertex.position -= zoneOffset;
-            vertex.position.serial(outputPosition);
-
-            vertex.normal.serial(outputNormal);
-
-            vertex.tile[0].uv.serial(texCoord0Output);
-
-            // use texture for tile ids
-            vertex.tileInfoUv.serial(texCoord1Output);
-            // use UV for tile ids
-            //			CUV tileIds(vertex.tile[0].tileId, vertex.tile[1].tileId);
-            //			tileIds.serial(texCoord1Output);
-        }
-        gltf::Primitive primitive = { .attributes = {} };
-        gltf::Accessor position = gltf::Accessor::position(0, 0, output.vertices.size());
-        gltf::Accessor normal = gltf::Accessor::normal(1, 0, output.vertices.size());
-        gltf::Accessor texcoord0 = { .bufferView = 2, .byteOffset = 0, .componentType = gltf::ComponentType::FLOAT, .count = output.vertices.size(), .type = gltf::AccessorType::VEC2 };
-        gltf::Accessor tileId = { .bufferView = 3, .byteOffset = 0, .componentType = gltf::ComponentType::FLOAT, .count = output.vertices.size(), .type = gltf::AccessorType::VEC2 };
-        primitive.attributes.position = asset.accessors.size();
-        asset.accessors.push_back(position);
-
-        primitive.attributes.normal = asset.accessors.size();
-        asset.accessors.push_back(normal);
-
-        primitive.attributes.texcoord0 = asset.accessors.size();
-        asset.accessors.push_back(texcoord0);
-
-        primitive.attributes.texcoord1 = asset.accessors.size();
-        asset.accessors.push_back(tileId);
-
-        mesh.primitives.push_back(primitive);
-        asset.meshes.push_back(mesh);
-
-        FILE *fp = nlfopen(outputFilePath, "w");
-        if (fp == NULL)
-        {
-            nlwarning("Can't open the file for writing: %s", outputFilePath.c_str());
-            return EXIT_FAILURE;
-        }
-        gltf::JsonWriter gltfWriter = { .file = fp };
-        asset.bufferViews.push_back({ .buffer = asset.buffers.size(), .byteLength = outputPosition.getPos() });
-        asset.buffers.push_back({ .uri = positionFilename, .byteLength = outputPosition.getPos() });
-        asset.bufferViews.push_back({ .buffer = asset.buffers.size(), .byteLength = outputNormal.getPos() });
-        asset.buffers.push_back({ .uri = normalFilename, .byteLength = outputNormal.getPos() });
-        asset.bufferViews.push_back({ .buffer = asset.buffers.size(), .byteLength = texCoord0Output.getPos() });
-        asset.buffers.push_back({ .uri = textCoord0Filename.value(), .byteLength = texCoord0Output.getPos() });
-        asset.bufferViews.push_back({ .buffer = asset.buffers.size(), .byteLength = texCoord1Output.getPos() });
-        asset.buffers.push_back({ .uri = texCoord1Filename.value(), .byteLength = texCoord1Output.getPos() });
-        gltfWriter.write(asset);
-        fclose(fp);
-        outputPosition.close();
-        outputNormal.close();
-        texCoord0Output.close();
-        texCoord1Output.close();
-
-        return EXIT_SUCCESS;
-    }
-    catch (const Exception &e)
-    {
-        nlwarning("Error in writing zone file: %s", e.what());
-        return EXIT_FAILURE;
-    }
 }
 
 void LandscapeManager::parsePath(std::string& path)
@@ -263,11 +81,52 @@ void LandscapeManager::LoadZoneDir(const std::string& path);
 
 void LandscapeManager::LoadZone(const std::string& path)
 {
-    CIFile zoneFile(path);
-    CZone zone;
-    zone.serial(zoneFile);
-    this->editZone.push_back(&zone);
+    CIFile zoneFile;
+    if (!zoneFile.open(path))
+    {
+        nlwarning("Can't open the file for reading: %s", path.c_str());
+        return;
+    }
+    
+    CLandscape landscape;
+    CAABBox bbox;
+    CZone loadingZone;
+    loadingZone.serial(zoneFile);
     zoneFile.close();
+
+    const auto zoneId(loadingZone.getZoneId());
+    landscape.setNoiseMode(false);
+    // add neighbor zones to get the same border vertices
+    addNeighborZones(landscape, zoneId, zoneSearchDirectory);
+    auto zone = landscape.getZone(zoneId);
+    if (zone == nullptr)
+    {
+        nlerror("Can't find zone with id: %i", zoneId);
+        return EXIT_FAILURE;
+    }
+    try
+    {
+        this->loadTileBank(landscape, bankFilePath);
+    }
+    catch (const Exception &)
+    {
+        nlerror("Can't load bankfile: %s", bankFilePath.c_str());
+        return EXIT_FAILURE;
+    }
+
+    const sint zoneX(zoneId & 255);
+    const sint zoneY(zoneId >> 8);
+    CVector zoneOffset(160.0f * zoneX, -160.0f * zoneY, 0.0f);
+    QImage normalMap = this->createNormalMap(NORMAL_MAP_SIZE, NORMAL_MAP_SIZE);
+    QImage tileIdMaps[TILE_LAYER_COUNT] = {
+        createTileIdMap(TILE_ID_MAP_SIZE, TILE_ID_MAP_SIZE),
+        createTileIdMap(TILE_ID_MAP_SIZE, TILE_ID_MAP_SIZE),
+        createTileIdMap(TILE_ID_MAP_SIZE, TILE_ID_MAP_SIZE)
+    };
+    for (sint patchIndex = 0; patchIndex < zone->getNumPatchs(); patchIndex++)
+    {
+        buildFaces(landscape, zoneId, patchIndex, output, tileIdMaps, normalMap);
+    }
 }
 
 uint8 LandscapeManager::getPatchTileIndex(const CPatch &patch, const uint8 s, const uint8 t)
