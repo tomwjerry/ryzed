@@ -5,7 +5,7 @@ find_package(SDL3)
 find_package(JPEG)
 find_package(GIF)
 find_package(PNG)
-find_package(NeL REQUIRED COMPONENTS misc ligo)
+find_package(NeL REQUIRED COMPONENTS misc ligo 3d)
 
 set(IMGUI_DIR "third_party/imgui" CACHE STRING "Path to the ImGui directory")
 
@@ -24,10 +24,12 @@ add_executable(ryzed
     src/main.cpp)
 
 target_include_directories(ryzed PRIVATE ${IMGUI_DIR})
+target_include_directories(ryzed PRIVATE "third_party")
 
 target_link_libraries(ryzed PRIVATE SDL3::SDL3)
 target_link_libraries(ryzed PRIVATE NeL::misc)
 target_link_libraries(ryzed PRIVATE NeL::ligo)
+target_link_libraries(ryzed PRIVATE NeL::3d)
 target_link_libraries(ryzed PRIVATE nfd)
 
 if (WIN32)

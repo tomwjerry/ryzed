@@ -2,8 +2,54 @@
 
 layout(location = 0) in vec2 tex_uv;
 layout(location = 0) out vec4 Color;
-layout(set = 2, binding = 0) uniform sampler2D tex;
+layout(set = 2, binding = 0) uniform sampler2D texSplat1;
+layout(set = 2, binding = 1) uniform sampler2D texSplat2;
+layout(set = 2, binding = 1) uniform sampler2D texSplat3;
+layout(set = 2, binding = 2) uniform sampler2D tex1;
+layout(set = 2, binding = 3) uniform sampler2D tex2;
+layout(set = 2, binding = 4) uniform sampler2D tex3;
+layout(set = 2, binding = 5) uniform sampler2D tex4;
+layout(set = 2, binding = 6) uniform sampler2D tex5;
+layout(set = 2, binding = 7) uniform sampler2D tex6;
+layout(set = 2, binding = 8) uniform sampler2D tex7;
+layout(set = 2, binding = 9) uniform sampler2D tex8;
+layout(set = 2, binding = 10) uniform sampler2D tex9;
+layout(set = 2, binding = 11) uniform sampler2D tex10;
+layout(set = 2, binding = 12) uniform sampler2D tex11;
+layout(set = 2, binding = 13) uniform sampler2D tex12;
 
 void main() {
-	Color = texture(tex, tex_uv);
+    vec4 splatted1 = texture(texSplat1, tex_uv).rgba;
+    vec4 splatted2 = texture(texSplat2, tex_uv).rgba;
+    vec4 splatted3 = texture(texSplat3, tex_uv).rgba;
+
+    vec2 tiledCoord = tex_uv * 10.0;
+    
+    vec4 color1 = texture(tex1, tiledCoord);
+    vec4 color2 = texture(tex2, tiledCoord);
+    vec4 color3 = texture(tex3, tiledCoord);
+    vec4 color4 = texture(tex4, tiledCoord);
+    vec4 color5 = texture(tex5, tiledCoord);
+    vec4 color6 = texture(tex6, tiledCoord);
+    vec4 color7 = texture(tex7, tiledCoord);
+    vec4 color8 = texture(tex8, tiledCoord);
+    vec4 color9 = texture(tex9, tiledCoord);
+    vec4 color10 = texture(tex10, tiledCoord);
+    vec4 color11 = texture(tex11, tiledCoord);
+    vec4 color12 = texture(tex12, tiledCoord);
+
+    vec3 finalColor = color1.rgb * splatted1.r;
+    finalColor = mix(finalColor, color2.rgb, splatted1.g);
+    finalColor = mix(finalColor, color3.rgb, splatted1.b);
+    finalColor = mix(finalColor, color4.rgb, splatted1.a);
+    finalColor = mix(finalColor, color5.rgb, splatted2.r);
+    finalColor = mix(finalColor, color6.rgb, splatted2.g);
+    finalColor = mix(finalColor, color7.rgb, splatted2.b);
+    finalColor = mix(finalColor, color8.rgb, splatted2.a);
+    finalColor = mix(finalColor, color9.rgb, splatted3.r);
+    finalColor = mix(finalColor, color10.rgb, splatted3.g);
+    finalColor = mix(finalColor, color11.rgb, splatted3.b);
+    finalColor = mix(finalColor, color12.rgb, splatted3.a);
+
+    Color = vec4(finalColor, 1.0);
 }
