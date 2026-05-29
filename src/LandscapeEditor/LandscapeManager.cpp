@@ -1,5 +1,5 @@
 /** 
- * Based on the code by zerotacg
+ * AGPL(?), Based on the code by zerotacg
  */
 
 #include "LandscapeManager.h"
@@ -39,14 +39,14 @@ LandscapeManager::~LandscapeManager()
     //delete this->editLandscapePrimitive;
 }
 
-void LandscapeManager::Load(const std::string& path)
+bool LandscapeManager::Load(const std::string& path)
 {
     // A landscape is a .landscape.json file
     // Open the file
     std::ifstream file(path);
     if (!file.is_open())
     {
-        return;
+        return false;
     }
 
     // "Parse" the JSON file (we don't even use a JSON parser, just pluck the strings)
@@ -63,6 +63,8 @@ void LandscapeManager::Load(const std::string& path)
 
     // Close the file
     file.close();
+
+    return true;
 }
 
 void LandscapeManager::parsePath(std::string& path)
@@ -71,38 +73,40 @@ void LandscapeManager::parsePath(std::string& path)
     path.erase(path.find_last_not_of(" \n\r\t\,\"") + 1);
 }
 
-void LandscapeManager::LoadZoneDir(const std::string& path);
+bool LandscapeManager::LoadZoneDir(const std::string& path);
 {
     for (const auto& entry : fs::directory_iterator(path))
     {
         this->LoadZone(entry.path().string());
     }
+
+    return true;
 }
 
-void LandscapeManager::LoadZone(const std::string& path)
+bool LandscapeManager::LoadZone(const std::string& path)
 {
-    CIFile zoneFile;
+    NLMISC::CIFile zoneFile;
     if (!zoneFile.open(path))
     {
         nlwarning("Can't open the file for reading: %s", path.c_str());
-        return;
+        return false;
     }
     
-    CLandscape landscape;
-    CAABBox bbox;
-    CZone loadingZone;
+    NL3D::CLandscape landscape;
+    NLMISC::CAABBox bbox;
+    NL3D::CZone loadingZone;
     loadingZone.serial(zoneFile);
     zoneFile.close();
 
     const auto zoneId(loadingZone.getZoneId());
     landscape.setNoiseMode(false);
     // add neighbor zones to get the same border vertices
-    addNeighborZones(landscape, zoneId, zoneSearchDirectory);
+    this->addNeighborZones(landscape, zoneId, zoneSearchDirectory);
     auto zone = landscape.getZone(zoneId);
     if (zone == nullptr)
     {
         nlerror("Can't find zone with id: %i", zoneId);
-        return EXIT_FAILURE;
+        return false;
     }
     try
     {
@@ -111,31 +115,33 @@ void LandscapeManager::LoadZone(const std::string& path)
     catch (const Exception &)
     {
         nlerror("Can't load bankfile: %s", bankFilePath.c_str());
-        return EXIT_FAILURE;
+        return false;
     }
 
     const sint zoneX(zoneId & 255);
     const sint zoneY(zoneId >> 8);
-    CVector zoneOffset(160.0f * zoneX, -160.0f * zoneY, 0.0f);
-    QImage normalMap = this->createNormalMap(NORMAL_MAP_SIZE, NORMAL_MAP_SIZE);
-    QImage tileIdMaps[TILE_LAYER_COUNT] = {
-        createTileIdMap(TILE_ID_MAP_SIZE, TILE_ID_MAP_SIZE),
-        createTileIdMap(TILE_ID_MAP_SIZE, TILE_ID_MAP_SIZE),
-        createTileIdMap(TILE_ID_MAP_SIZE, TILE_ID_MAP_SIZE)
-    };
+    NLMISC::CVector zoneOffset(160.0f * zoneX, -160.0f * zoneY, 0.0f);
+    Image* normalMap = nullptr;
+    this->createNormalMap(normalMap, NORMAL_MAP_SIZE, NORMAL_MAP_SIZE);
+    Image* tileIdMaps[TILE_LAYER_COUNT];
+    this->createTileIdMap(tileIdMaps[0], TILE_ID_MAP_SIZE, TILE_ID_MAP_SIZE);
+    this->createTileIdMap(tileIdMaps[1], TILE_ID_MAP_SIZE, TILE_ID_MAP_SIZE);
+    this->createTileIdMap(tileIdMaps[2], TILE_ID_MAP_SIZE, TILE_ID_MAP_SIZE);
     for (sint patchIndex = 0; patchIndex < zone->getNumPatchs(); patchIndex++)
     {
-        buildFaces(landscape, zoneId, patchIndex, output, tileIdMaps, normalMap);
+        this->buildFaces(landscape, zoneId, patchIndex, output, tileIdMaps, normalMap);
     }
+
+    return true;
 }
 
-uint8 LandscapeManager::getPatchTileIndex(const CPatch &patch, const uint8 s, const uint8 t)
+uint8 LandscapeManager::getPatchTileIndex(const NL3D::CPatch& patch, const uint8 s, const uint8 t)
 {
     return t * patch.getOrderS() + s;
 }
 
 // check CTessFace::initTileUvRGBA for correct calculation
-CUV LandscapeManager::tileOrientation(CUV in, uint8 orientation)
+NLMISC::CUV LandscapeManager::tileOrientation(NLMISC::CUV in, uint8 orientation)
 {
     switch (orientation)
     {
@@ -151,30 +157,35 @@ CUV LandscapeManager::tileOrientation(CUV in, uint8 orientation)
     }
 }
 
-CUV LandscapeManager::tileUV(const CUV &in, uint8 orientation, bool is256, uint8 uvOff)
+NLMISC::CUV LandscapeManager::tileUV(const NLMISC::CUV &in, uint8 orientation,
+    bool is256, uint8 uvOff)
 {
-    CUV out(in);
+    NLMISC::CUV out(in);
     if (is256)
     {
         out *= 0.5;
         // with rotation applied afterward we need to reverse the already applied rotation in uvOff
         uvOff = (uvOff + orientation) & 3;
         if (uvOff == 2 || uvOff == 3)
+        {
             out.U += 0.5;
+        }
         if (uvOff == 1 || uvOff == 2)
+        {
             out.V += 0.5;
+        }
     }
     // Do the HalfPixel scale bias.
     float hBiasXY, hBiasZ;
     if (is256)
     {
-        hBiasXY = CLandscapeGlobals::TilePixelBias256;
-        hBiasZ = CLandscapeGlobals::TilePixelScale256;
+        hBiasXY = NL3D::CLandscapeGlobals::TilePixelBias256;
+        hBiasZ = NL3D::CLandscapeGlobals::TilePixelScale256;
     }
     else
     {
-        hBiasXY = CLandscapeGlobals::TilePixelBias128;
-        hBiasZ = CLandscapeGlobals::TilePixelScale128;
+        hBiasXY = NL3D::CLandscapeGlobals::TilePixelBias128;
+        hBiasZ = NL3D::CLandscapeGlobals::TilePixelScale128;
     }
 
     hBiasXY = 0.0f;
@@ -189,24 +200,33 @@ CUV LandscapeManager::tileUV(const CUV &in, uint8 orientation, bool is256, uint8
     return out;
 }
 
-void LandscapeManager::setPixel(QImage &image, int x, int y, uint16 grayscale)
+void LandscapeManager::setPixel(Image& image, int x, int y, uint16 grayscale)
 {
-    nlassert(image.format() == QImage::Format_Grayscale16);
-    ((uint16 *)image.scanLine(y))[x] = grayscale;
+    nlassert(image.component == 1);
+    (uint16)image.pixels[x * y] = grayscale;
 }
 
-QImage LandscapeManager::createNormalMap(int width, int height)
+void LandscapeManager::createNormalMap(Image& image, int width, int height)
 {
-    QImage image(width, height, QImage::Format_RGB32);
-    image.fill(QColor::fromRgbF(0.0f, 0.0f, 1.0f));
-    return image;
+    image.width = width;
+    image.height = height;
+    image.component = 3;
+    image.Prepare();
+
+    for (int y = 0; y < height; y++)
+    {
+        for (int x = 0; x < width; x++)
+        {
+            image.pixels[x * y] = 0x00F;
+        }
+    }
 }
 
-void LandscapeManager::drawNormalMap(const CPatch &patch, QImage &image)
+void LandscapeManager::drawNormalMap(const NL3D::CPatch &patch, Image &image)
 {
-    CBezierPatch bezierPatch;
+    NL3D::CBezierPatch bezierPatch;
     patch.unpack(bezierPatch);
-    auto scale = image.width() / PATCH_SIZE;
+    auto scale = image.width / this->PATCH_SIZE;
     auto orderS = patch.getOrderS() * scale;
     auto orderT = patch.getOrderT() * scale;
     float OOS = 1.0f / (orderS - 1);
@@ -215,33 +235,53 @@ void LandscapeManager::drawNormalMap(const CPatch &patch, QImage &image)
     {
         for (auto x = 0; x < orderS; x++)
         {
-            CVector normal(bezierPatch.evalNormal(x * OOS, y * OOT));
-            image.setPixelColor(x, y, QColor::fromRgbF(normal.x, normal.y, normal.z));
+            NL3D::CVector normal(bezierPatch.evalNormal(x * OOS, y * OOT));
+            image.pixels[x * y] =
+                (static_cast<int>(normal.x * 255.0f) << 16) |
+                (static_cast<int>(normal.y * 255.0f) << 8)  |
+                static_cast<int>(normal.z * 255.0f);
+    }
+}
+
+void LandscapeManager::drawImage(Image& target, int x, int y, Image& part)
+{
+    for (int iy = y; iy < target.height && iy < part.height; iy++)
+    {
+        for (int ix = x; ix < target.width && ix < part.width; ix++)
+        {
+            target.pixels[ix * iy] = part.pixels[ix - x + (iy - y) * part.width];
         }
     }
 }
 
-void LandscapeManager::drawImage(QImage &target, int x, int y, QImage &part)
+void LandscapeManager::createTileIdMap(Image& image, int width, int height)
 {
-    QPainter painter(&target);
-    painter.drawImage(QPoint(x, y), part);
-}
+    image.width = width;
+    image.height = height;
+    image.component = 8;
+    image.Prepare();
 
-QImage LandscapeManager::createTileIdMap(int width, int height)
-{
-    QImage image(width, height, QImage::Format_RGBA64);
-    image.fill(QColor::fromRgba64(qRgba64(NL_TILE_ELM_LAYER_EMPTY, 0, 0, NL_TILE_ELM_LAYER_EMPTY)));
-    return image;
+    for (int y = 0; y < height; y++)
+    {
+        for (int x = 0; x < width; x++)
+        {
+            image.pixels[x * y] =
+                (static_cast<int>(NL3D::NL_TILE_ELM_LAYER_EMPTY) << 48) |
+                (static_cast<int>(0) << 32) |
+                (static_cast<int>(0) << 16) |
+                static_cast<int>(NL3D::NL_TILE_ELM_LAYER_EMPTY);
+        }
+    }
 }
 
 uint8 LandscapeManager::getTileOrientation(
-    const CPatch &patch, const CTileElement &tile, const uint8 layer)
+    const NL3D::CPatch &patch, const NL3D::CTileElement &tile, const uint8 layer)
 {
-
     return tile.getTileOrient(layer);
 }
 
-void LandscapeManager::drawTileInfoMap(const CPatch &patch, QImage &image, uint8 layer)
+void LandscapeManager::drawTileInfoMap(
+    const NL3D::CPatch& patch, Image& image, uint8 layer)
 {
     const auto &tiles = patch.Tiles;
     auto &tileBank = patch.getLandscape()->TileBank;
@@ -250,27 +290,30 @@ void LandscapeManager::drawTileInfoMap(const CPatch &patch, QImage &image, uint8
     {
         for (auto x = 0; x < patch.getOrderS(); x++)
         {
-            auto tileIndex = getPatchTileIndex(patch, x, y);
+            auto tileIndex = this->getPatchTileIndex(patch, x, y);
             const auto &tile = tiles[tileIndex];
             const auto orientation = tile.getTileOrient(layer);
             const auto tileId = tile.Tile[layer];
             uint8 rotAlpha = 0;
-            if (tileId != NL_TILE_ELM_LAYER_EMPTY)
+            if (tileId != NL3D::NL_TILE_ELM_LAYER_EMPTY)
             {
                 rotAlpha = tileBank.getTile(tileId)->getRotAlpha();
             }
-            image.setPixelColor(x, y,
-                QColor::fromRgba64(qRgba64(tileId, orientation, rotAlpha, NL_TILE_ELM_LAYER_EMPTY)));
+            image.pixels[x * y] =
+                (static_cast<int>(tileId) << 48) |
+                (static_cast<int>(orientation) << 32) |
+                (static_cast<int>(rotAlpha) << 16) |
+                static_cast<int>(NL3D::NL_TILE_ELM_LAYER_EMPTY);
         }
     }
 }
 
 void LandscapeManager::buildFaces(
-    CLandscape &landscape, sint zoneId, sint patch,
-    OutputData &output, QImage *tileIdMap, QImage &normalMap)
+    NL3D::CLandscape& landscape, sint zoneId, sint patch,
+    OutputData& output, Image* tileIdMap, Image& normalMap)
 {
-    CUV A(0, 0), B(0, 1), C(1, 1), D(1, 0);
-    CZone *pZone = landscape.getZone(zoneId);
+    NLMISC::CUV A(0, 0), B(0, 1), C(1, 1), D(1, 0);
+    NL3D::CZone *pZone = landscape.getZone(zoneId);
 
     // Then trace all patch.
     nlassert(patch >= 0);
@@ -341,63 +384,69 @@ void LandscapeManager::buildFaces(
                 .normal = na,
                 .tileInfoUv = a,
                 .tile = {
-                    { .tileId = tile.Tile[0], .uv = tileUV(A, tile.getTileOrient(0), is256, uvOff) },
-                    { .tileId = tile.Tile[1], .uv = tileUV(A, tile.getTileOrient(1), is256, uvOff) },
-                    { .tileId = tile.Tile[2], .uv = tileUV(A, tile.getTileOrient(2), is256, uvOff) } } });
+                    { .tileId = tile.Tile[0],
+                        .uv = tileUV(A, tile.getTileOrient(0), is256, uvOff) },
+                    { .tileId = tile.Tile[1],
+                        .uv = tileUV(A, tile.getTileOrient(1), is256, uvOff) },
+                    { .tileId = tile.Tile[2],
+                        .uv = tileUV(A, tile.getTileOrient(2), is256, uvOff) } } });
             output.vertices.push_back({ .position = vb,
                 .normal = nb,
                 .tileInfoUv = b,
                 .tile = {
-                    { .tileId = tile.Tile[0], .uv = tileUV(B, tile.getTileOrient(0), is256, uvOff) },
-                    { .tileId = tile.Tile[1], .uv = tileUV(B, tile.getTileOrient(1), is256, uvOff) },
-                    { .tileId = tile.Tile[2], .uv = tileUV(B, tile.getTileOrient(2), is256, uvOff) } } });
+                    { .tileId = tile.Tile[0],
+                        .uv = tileUV(B, tile.getTileOrient(0), is256, uvOff) },
+                    { .tileId = tile.Tile[1],
+                        .uv = tileUV(B, tile.getTileOrient(1), is256, uvOff) },
+                    { .tileId = tile.Tile[2],
+                        .uv = tileUV(B, tile.getTileOrient(2), is256, uvOff) } } });
             output.vertices.push_back({ .position = vc,
                 .normal = nc,
                 .tileInfoUv = c,
                 .tile = {
-                    { .tileId = tile.Tile[0], .uv = tileUV(C, tile.getTileOrient(0), is256, uvOff) },
-                    { .tileId = tile.Tile[1], .uv = tileUV(C, tile.getTileOrient(1), is256, uvOff) },
-                    { .tileId = tile.Tile[2], .uv = tileUV(C, tile.getTileOrient(2), is256, uvOff) } } });
+                    { .tileId = tile.Tile[0],
+                        .uv = tileUV(C, tile.getTileOrient(0), is256, uvOff) },
+                    { .tileId = tile.Tile[1],
+                        .uv = tileUV(C, tile.getTileOrient(1), is256, uvOff) },
+                    { .tileId = tile.Tile[2],
+                        .uv = tileUV(C, tile.getTileOrient(2), is256, uvOff) } } });
 
             output.vertices.push_back({ .position = va,
                 .normal = na,
                 .tileInfoUv = a,
                 .tile = {
-                    { .tileId = tile.Tile[0], .uv = tileUV(A, tile.getTileOrient(0), is256, uvOff) },
-                    { .tileId = tile.Tile[1], .uv = tileUV(A, tile.getTileOrient(1), is256, uvOff) },
-                    { .tileId = tile.Tile[2], .uv = tileUV(A, tile.getTileOrient(2), is256, uvOff) } } });
+                    { .tileId = tile.Tile[0],
+                        .uv = tileUV(A, tile.getTileOrient(0), is256, uvOff) },
+                    { .tileId = tile.Tile[1],
+                        .uv = tileUV(A, tile.getTileOrient(1), is256, uvOff) },
+                    { .tileId = tile.Tile[2],
+                        .uv = tileUV(A, tile.getTileOrient(2), is256, uvOff) } } });
             output.vertices.push_back({ .position = vc,
                 .normal = nc,
                 .tileInfoUv = c,
                 .tile = {
-                    { .tileId = tile.Tile[0], .uv = tileUV(C, tile.getTileOrient(0), is256, uvOff) },
-                    { .tileId = tile.Tile[1], .uv = tileUV(C, tile.getTileOrient(1), is256, uvOff) },
-                    { .tileId = tile.Tile[2], .uv = tileUV(C, tile.getTileOrient(2), is256, uvOff) } } });
+                    { .tileId = tile.Tile[0],
+                        .uv = tileUV(C, tile.getTileOrient(0), is256, uvOff) },
+                    { .tileId = tile.Tile[1],
+                        .uv = tileUV(C, tile.getTileOrient(1), is256, uvOff) },
+                    { .tileId = tile.Tile[2],
+                        .uv = tileUV(C, tile.getTileOrient(2), is256, uvOff) } } });
             output.vertices.push_back({ .position = vd,
                 .normal = nd,
                 .tileInfoUv = d,
                 .tile = {
-                    { .tileId = tile.Tile[0], .uv = tileUV(D, tile.getTileOrient(0), is256, uvOff) },
-                    { .tileId = tile.Tile[1], .uv = tileUV(D, tile.getTileOrient(1), is256, uvOff) },
-                    { .tileId = tile.Tile[2], .uv = tileUV(D, tile.getTileOrient(2), is256, uvOff) } } });
+                    { .tileId = tile.Tile[0],
+                        .uv = tileUV(D, tile.getTileOrient(0), is256, uvOff) },
+                    { .tileId = tile.Tile[1],
+                        .uv = tileUV(D, tile.getTileOrient(1), is256, uvOff) },
+                    { .tileId = tile.Tile[2],
+                        .uv = tileUV(D, tile.getTileOrient(2), is256, uvOff) } } });
         }
     }
 }
 
-std::string LandscapeManager::getLongArgFirstValue(
-    const NLMISC::CCmdArgs &args, const std::string &argName)
-{
-    std::string firstValue;
-    const auto values = args.getLongArg(argName);
-    if (!values.empty())
-    {
-        firstValue = values.front();
-    }
-    return firstValue;
-}
-
-void LandscapeManager::addZone(CLandscape &landscape,
-    const std::string &zoneSearchDirectory,
+void LandscapeManager::addZone(CLandscape& landscape,
+    const std::string& zoneSearchDirectory,
     const sint x, const sint y)
 {
     std::string zoneFilename(zoneSearchDirectory);
@@ -428,8 +477,8 @@ void LandscapeManager::addZone(CLandscape &landscape,
     }
 }
 
-void LandscapeManager::addNeighborZones(CLandscape &landscape, const uint16 &zoneId,
-    const std::string &zoneSearchDirectory)
+void LandscapeManager::addNeighborZones(CLandscape& landscape, const uint16& zoneId,
+    const std::string& zoneSearchDirectory)
 {
     const sint x(zoneId & 255);
     const sint y(zoneId >> 8);
@@ -445,20 +494,7 @@ void LandscapeManager::addNeighborZones(CLandscape &landscape, const uint16 &zon
     addZone(landscape, zoneSearchDirectory, x + 1, y + 1);
 }
 
-std::optional<std::string> LandscapeManager::openFile(COFile &file,
-    const std::string &directory, const std::string &basename, const std::string &suffix)
-{
-    std::string fileName = basename + suffix;
-    std::string filePath = directory + "/" + fileName;
-    if (!file.open(filePath, false, false, false))
-    {
-        nlwarning("Can't open the file for writing: %s", filePath.c_str());
-    }
-
-    return fileName;
-}
-
-void LandscapeManager::loadTileBank(CLandscape &landscape, const std::string &bankFilePath)
+void LandscapeManager::loadTileBank(CLandscape& landscape, const std::string& bankFilePath)
 {
     if (!bankFilePath.empty())
     {
@@ -469,4 +505,48 @@ void LandscapeManager::loadTileBank(CLandscape &landscape, const std::string &ba
         nldebug("TileBank tileSet count %i", tileBank.getTileSetCount());
         nldebug("TileBank tile count %i", tileBank.getTileCount());
     }
+}
+
+SDL_GPUBuffer* RenderablePrimitive::createBuffer(
+    SDL_GPUDevice* device, const void* data, size_t size,
+    SDL_GPUBufferUsageFlags usage)
+{
+    SDL_GPUBuffer* Scene::createBuffer(
+    SDL_GPUDevice* device, const void* data, size_t size, SDL_GPUBufferUsageFlags usage)
+{
+    SDL_GPUBufferCreateInfo bufferCreateInfo = SDL_GPUBufferCreateInfo();
+    bufferCreateInfo.usage = usage;
+    bufferCreateInfo.size = static_cast<Uint32>(size);
+    SDL_GPUBuffer* buffer = SDL_CreateGPUBuffer(device, &bufferCreateInfo);
+    
+    SDL_GPUTransferBufferCreateInfo transferInfo = SDL_GPUTransferBufferCreateInfo();
+    transferInfo.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
+    transferInfo.size = static_cast<Uint32>(size);
+    SDL_GPUTransferBuffer* transferBuffer =
+        SDL_CreateGPUTransferBuffer(device, &transferInfo);
+
+    void* transferData = SDL_MapGPUTransferBuffer(device, transferBuffer, false);
+    memcpy(transferData, data, size);
+    SDL_UnmapGPUTransferBuffer(device, transferBuffer);
+
+    SDL_GPUCommandBuffer* cmd = SDL_AcquireGPUCommandBuffer(device);
+    SDL_GPUCopyPass* copyPass = SDL_BeginGPUCopyPass(cmd);
+
+    SDL_GPUTransferBufferLocation src = SDL_GPUTransferBufferLocation();
+    src.transfer_buffer = transferBuffer;
+    src.offset = 0;
+
+    SDL_GPUBufferRegion dst = SDL_GPUBufferRegion();
+    dst.buffer = buffer;
+    dst.offset = 0;
+    dst.size = static_cast<Uint32>(size);
+    
+    SDL_UploadToGPUBuffer(copyPass, &src, &dst, false);
+
+    SDL_EndGPUCopyPass(copyPass);
+    SDL_SubmitGPUCommandBuffer(cmd);
+
+    SDL_ReleaseGPUTransferBuffer(device, transferBuffer);
+
+    return buffer;
 }
