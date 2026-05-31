@@ -121,8 +121,6 @@ bool LandscapeManager::LoadZone(const std::string& path)
     const sint zoneX(zoneId & 255);
     const sint zoneY(zoneId >> 8);
     NLMISC::CVector zoneOffset(160.0f * zoneX, -160.0f * zoneY, 0.0f);
-    Image* normalMap = nullptr;
-    this->createNormalMap(normalMap, NORMAL_MAP_SIZE, NORMAL_MAP_SIZE);
     Image* tileIdMaps[TILE_LAYER_COUNT];
     this->createTileIdMap(tileIdMaps[0], TILE_ID_MAP_SIZE, TILE_ID_MAP_SIZE);
     this->createTileIdMap(tileIdMaps[1], TILE_ID_MAP_SIZE, TILE_ID_MAP_SIZE);
@@ -274,12 +272,6 @@ void LandscapeManager::createTileIdMap(Image& image, int width, int height)
     }
 }
 
-uint8 LandscapeManager::getTileOrientation(
-    const NL3D::CPatch &patch, const NL3D::CTileElement &tile, const uint8 layer)
-{
-    return tile.getTileOrient(layer);
-}
-
 void LandscapeManager::drawTileInfoMap(
     const NL3D::CPatch& patch, Image& image, uint8 layer)
 {
@@ -291,7 +283,7 @@ void LandscapeManager::drawTileInfoMap(
         for (auto x = 0; x < patch.getOrderS(); x++)
         {
             auto tileIndex = this->getPatchTileIndex(patch, x, y);
-            const auto &tile = tiles[tileIndex];
+            const auto& tile = tiles[tileIndex];
             const auto orientation = tile.getTileOrient(layer);
             const auto tileId = tile.Tile[layer];
             uint8 rotAlpha = 0;
@@ -318,129 +310,126 @@ void LandscapeManager::buildFaces(
     // Then trace all patch.
     nlassert(patch >= 0);
     nlassert(patch < pZone->getNumPatchs());
-    const CPatch *pa = const_cast<const CZone *>(pZone)->getPatch(patch);
-    const auto &tiles = pa->Tiles;
-    CBezierPatch bezierPatch;
+    const NL3D::CPatch* pa = const_cast<const NL3D::CZone*>(pZone)->getPatch(patch);
+    const auto& tiles = pa->Tiles;
+    NL3D::CBezierPatch bezierPatch;
     pa->unpack(bezierPatch);
 
     // Build the faces.
     //=================
     uint8 ordS = pa->getOrderS();
     uint8 ordT = pa->getOrderT();
-    uint16 patchOffset(patch * PATCH_SIZE);
+    uint16 patchOffset(patch * this->PATCH_SIZE);
     uint8 x, y;
-    float pixelOffset = 0.125f / TILE_ID_MAP_SIZE;
+    float pixelOffset = 0.125f / this->TILE_ID_MAP_SIZE;
     float OOS = 1.0f / ordS;
     float OOT = 1.0f / ordT;
-
-    uint16 normal_offset_x((patch * NORMAL_SIZE) % normalMap.width()),
-        normal_offset_y(((patch * NORMAL_SIZE) / normalMap.height()) * NORMAL_SIZE);
-    QImage normalMapPatch = createNormalMap(NORMAL_SIZE, NORMAL_SIZE);
-    drawNormalMap(*pa, normalMapPatch);
-    drawImage(normalMap, normal_offset_x, normal_offset_y, normalMapPatch);
-
-    uint16 offset_x(patchOffset % TILE_ID_MAP_SIZE),
-        offset_y((patchOffset / TILE_ID_MAP_SIZE) * PATCH_SIZE);
-    QImage tileInfoMapPatch = createTileIdMap(PATCH_SIZE, PATCH_SIZE);
-    drawTileInfoMap(*pa, tileInfoMapPatch, 0);
-    drawImage(tileIdMap[0], offset_x, offset_y, tileInfoMapPatch);
-    drawTileInfoMap(*pa, tileInfoMapPatch, 1);
-    drawImage(tileIdMap[1], offset_x, offset_y, tileInfoMapPatch);
-    drawTileInfoMap(*pa, tileInfoMapPatch, 2);
-    drawImage(tileIdMap[2], offset_x, offset_y, tileInfoMapPatch);
 
     for (y = 0; y < ordT; y++)
     {
         for (x = 0; x < ordS; x++)
         {
-            auto tileIndex = getPatchTileIndex(*pa, x, y);
-            const auto &tile = tiles[tileIndex];
-            if (tile.Tile[0] == NL_TILE_ELM_LAYER_EMPTY)
+            auto tileIndex = this->getPatchTileIndex(*pa, x, y);
+            const auto& tile = tiles[tileIndex];
+            if (tile.Tile[0] == NL3D::NL_TILE_ELM_LAYER_EMPTY)
             {
                 nlwarning("tile base layer not defined patch %d x %d y %d tileIndex %d",
                     patch, x, y, tileIndex);
             }
             uint16 imageX = offset_x + x;
             uint16 imageY = offset_y + y;
-            CUV tileInfo(imageX, imageY);
-            CUV b(tileInfo.U, tileInfo.V + pixelOffset);
-            CUV c(tileInfo.U + pixelOffset, tileInfo.V + pixelOffset);
-            CUV d(tileInfo.U + pixelOffset, tileInfo.V);
-            CVector uvScaleBias;
+            NLMISC::CUV tileInfo(imageX, imageY);
+            NLMISC::CUV b(tileInfo.U, tileInfo.V + pixelOffset);
+            NLMISC::CUV c(tileInfo.U + pixelOffset, tileInfo.V + pixelOffset);
+            NLMISC::CUV d(tileInfo.U + pixelOffset, tileInfo.V);
+            NL3D::CVector uvScaleBias;
             bool is256;
             uint8 uvOff;
             tile.getTile256Info(is256, uvOff);
 
-            CVector va(pa->computeContinousVertex(x * OOS, y * OOT));
-            CVector vb(pa->computeContinousVertex(x * OOS, (y + 1) * OOT));
-            CVector vc(pa->computeContinousVertex((x + 1) * OOS, (y + 1) * OOT));
-            CVector vd(pa->computeContinousVertex((x + 1) * OOS, y * OOT));
-            CVector na(bezierPatch.evalNormal(x * OOS, y * OOT));
-            CVector nb(bezierPatch.evalNormal(x * OOS, (y + 1) * OOT));
-            CVector nc(bezierPatch.evalNormal((x + 1) * OOS, (y + 1) * OOT));
-            CVector nd(bezierPatch.evalNormal((x + 1) * OOS, y * OOT));
+            NL3D::CVector va(pa->computeContinousVertex(x * OOS, y * OOT));
+            NL3D::CVector vb(pa->computeContinousVertex(x * OOS, (y + 1) * OOT));
+            NL3D::CVector vc(pa->computeContinousVertex((x + 1) * OOS, (y + 1) * OOT));
+            NL3D::CVector vd(pa->computeContinousVertex((x + 1) * OOS, y * OOT));
+            NL3D::CVector na(bezierPatch.evalNormal(x * OOS, y * OOT));
+            NL3D::CVector nb(bezierPatch.evalNormal(x * OOS, (y + 1) * OOT));
+            NL3D::CVector nc(bezierPatch.evalNormal((x + 1) * OOS, (y + 1) * OOT));
+            NL3D::CVector nd(bezierPatch.evalNormal((x + 1) * OOS, y * OOT));
 
-            output.vertices.push_back({ .position = va,
-                .normal = na,
-                .tileInfoUv = a,
-                .tile = {
-                    { .tileId = tile.Tile[0],
-                        .uv = tileUV(A, tile.getTileOrient(0), is256, uvOff) },
-                    { .tileId = tile.Tile[1],
-                        .uv = tileUV(A, tile.getTileOrient(1), is256, uvOff) },
-                    { .tileId = tile.Tile[2],
-                        .uv = tileUV(A, tile.getTileOrient(2), is256, uvOff) } } });
-            output.vertices.push_back({ .position = vb,
-                .normal = nb,
-                .tileInfoUv = b,
-                .tile = {
-                    { .tileId = tile.Tile[0],
-                        .uv = tileUV(B, tile.getTileOrient(0), is256, uvOff) },
-                    { .tileId = tile.Tile[1],
-                        .uv = tileUV(B, tile.getTileOrient(1), is256, uvOff) },
-                    { .tileId = tile.Tile[2],
-                        .uv = tileUV(B, tile.getTileOrient(2), is256, uvOff) } } });
-            output.vertices.push_back({ .position = vc,
-                .normal = nc,
-                .tileInfoUv = c,
-                .tile = {
-                    { .tileId = tile.Tile[0],
-                        .uv = tileUV(C, tile.getTileOrient(0), is256, uvOff) },
-                    { .tileId = tile.Tile[1],
-                        .uv = tileUV(C, tile.getTileOrient(1), is256, uvOff) },
-                    { .tileId = tile.Tile[2],
-                        .uv = tileUV(C, tile.getTileOrient(2), is256, uvOff) } } });
-
-            output.vertices.push_back({ .position = va,
-                .normal = na,
-                .tileInfoUv = a,
-                .tile = {
-                    { .tileId = tile.Tile[0],
-                        .uv = tileUV(A, tile.getTileOrient(0), is256, uvOff) },
-                    { .tileId = tile.Tile[1],
-                        .uv = tileUV(A, tile.getTileOrient(1), is256, uvOff) },
-                    { .tileId = tile.Tile[2],
-                        .uv = tileUV(A, tile.getTileOrient(2), is256, uvOff) } } });
-            output.vertices.push_back({ .position = vc,
-                .normal = nc,
-                .tileInfoUv = c,
-                .tile = {
-                    { .tileId = tile.Tile[0],
-                        .uv = tileUV(C, tile.getTileOrient(0), is256, uvOff) },
-                    { .tileId = tile.Tile[1],
-                        .uv = tileUV(C, tile.getTileOrient(1), is256, uvOff) },
-                    { .tileId = tile.Tile[2],
-                        .uv = tileUV(C, tile.getTileOrient(2), is256, uvOff) } } });
-            output.vertices.push_back({ .position = vd,
-                .normal = nd,
-                .tileInfoUv = d,
-                .tile = {
-                    { .tileId = tile.Tile[0],
-                        .uv = tileUV(D, tile.getTileOrient(0), is256, uvOff) },
-                    { .tileId = tile.Tile[1],
-                        .uv = tileUV(D, tile.getTileOrient(1), is256, uvOff) },
-                    { .tileId = tile.Tile[2],
-                        .uv = tileUV(D, tile.getTileOrient(2), is256, uvOff) } } });
+            std::vector<VertexData> vertices;
+            VertexData vert;
+            vertices.push_back({
+                va,
+                na,
+                a,
+                {
+                    {
+                        tile.Tile[0],
+                        tileUV(A, tile.getTileOrient(0), is256, uvOff)
+                    },
+                    {
+                        tile.Tile[1],
+                        tileUV(A, tile.getTileOrient(1), is256, uvOff)
+                    },
+                    {
+                        tile.Tile[2],
+                        tileUV(A, tile.getTileOrient(2), is256, uvOff)
+                    }
+                }
+            });
+            vertices.push_back({
+                vb,
+                nb,
+                b,
+                {
+                    {
+                        tile.Tile[0],
+                        tileUV(B, tile.getTileOrient(0), is256, uvOff)
+                    },
+                    {
+                        tile.Tile[1],
+                        tileUV(B, tile.getTileOrient(1), is256, uvOff)
+                    },
+                    {
+                        tile.Tile[2],
+                        tileUV(B, tile.getTileOrient(2), is256, uvOff)
+                    }
+                }
+            });
+            vertices.push_back({
+                vc,
+                nc,
+                c,
+                {
+                    {
+                        tile.Tile[0],
+                        tileUV(C, tile.getTileOrient(0), is256, uvOff) },
+                    {
+                        tile.Tile[1],
+                        tileUV(C, tile.getTileOrient(1), is256, uvOff) },
+                    {
+                        tile.Tile[2],
+                        tileUV(C, tile.getTileOrient(2), is256, uvOff)
+                    }
+                }
+            });
+            vertices.push_back({
+                vd,
+                nd,
+                d,
+                {
+                    {
+                        tile.Tile[0],
+                        tileUV(D, tile.getTileOrient(0), is256, uvOff) },
+                    {
+                        tile.Tile[1],
+                        tileUV(D, tile.getTileOrient(1), is256, uvOff) },
+                    {
+                        tile.Tile[2],
+                        .uv = tileUV(D, tile.getTileOrient(2), is256, uvOff)
+                    }
+                }
+            });
         }
     }
 }
@@ -507,12 +496,9 @@ void LandscapeManager::loadTileBank(CLandscape& landscape, const std::string& ba
     }
 }
 
-SDL_GPUBuffer* RenderablePrimitive::createBuffer(
+SDL_GPUBuffer* LandscapeManager::createBuffer(
     SDL_GPUDevice* device, const void* data, size_t size,
     SDL_GPUBufferUsageFlags usage)
-{
-    SDL_GPUBuffer* Scene::createBuffer(
-    SDL_GPUDevice* device, const void* data, size_t size, SDL_GPUBufferUsageFlags usage)
 {
     SDL_GPUBufferCreateInfo bufferCreateInfo = SDL_GPUBufferCreateInfo();
     bufferCreateInfo.usage = usage;

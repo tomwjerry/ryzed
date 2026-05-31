@@ -44,15 +44,8 @@ private:
     NLMISC::CUV tileOrientation(NLMISC::CUV in, uint8 orientation);
     NLMISC::CUV tileUV(const NLMISC::CUV &in, uint8 orientation, bool is256, uint8 uvOff);
     void setPixel(Image& image, int x, int y, uint16 grayscale);
-    
-    void createNormalMap(Image* image, int width, int height);
-    void drawNormalMap(const NL3D::CPatch& patch, Image& image);
-    
     void drawImage(Image& target, int x, int y, Image& part);
-
     void createTileIdMap(Image* image, int width, int height);
-    uint8 getTileOrientation(
-        const NL3D::CPatch& patch, const NL3D::CTileElement& tile, const uint8 layer);
     void drawTileInfoMap(const NL3D::CPatch& patch, Image& image, uint8 layer);
     
     void buildFaces(
