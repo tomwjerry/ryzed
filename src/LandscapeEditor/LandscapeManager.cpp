@@ -204,43 +204,6 @@ void LandscapeManager::setPixel(Image& image, int x, int y, uint16 grayscale)
     (uint16)image.pixels[x * y] = grayscale;
 }
 
-void LandscapeManager::createNormalMap(Image& image, int width, int height)
-{
-    image.width = width;
-    image.height = height;
-    image.component = 3;
-    image.Prepare();
-
-    for (int y = 0; y < height; y++)
-    {
-        for (int x = 0; x < width; x++)
-        {
-            image.pixels[x * y] = 0x00F;
-        }
-    }
-}
-
-void LandscapeManager::drawNormalMap(const NL3D::CPatch &patch, Image &image)
-{
-    NL3D::CBezierPatch bezierPatch;
-    patch.unpack(bezierPatch);
-    auto scale = image.width / this->PATCH_SIZE;
-    auto orderS = patch.getOrderS() * scale;
-    auto orderT = patch.getOrderT() * scale;
-    float OOS = 1.0f / (orderS - 1);
-    float OOT = 1.0f / (orderT - 1);
-    for (auto y = 0; y < orderT; y++)
-    {
-        for (auto x = 0; x < orderS; x++)
-        {
-            NL3D::CVector normal(bezierPatch.evalNormal(x * OOS, y * OOT));
-            image.pixels[x * y] =
-                (static_cast<int>(normal.x * 255.0f) << 16) |
-                (static_cast<int>(normal.y * 255.0f) << 8)  |
-                static_cast<int>(normal.z * 255.0f);
-    }
-}
-
 void LandscapeManager::drawImage(Image& target, int x, int y, Image& part)
 {
     for (int iy = y; iy < target.height && iy < part.height; iy++)
@@ -324,6 +287,18 @@ void LandscapeManager::buildFaces(
     float pixelOffset = 0.125f / this->TILE_ID_MAP_SIZE;
     float OOS = 1.0f / ordS;
     float OOT = 1.0f / ordT;
+
+    uint16 offset_x(patchOffset % TILE_ID_MAP_SIZE),
+    uint16 offset_y((patchOffset / TILE_ID_MAP_SIZE) * PATCH_SIZE);
+    Image tileInfoMapPatch;
+    this->createTileIdMap(tileInfoMapPatch, PATCH_SIZE, PATCH_SIZE);
+    this->drawTileInfoMap(*pa, tileInfoMapPatch, 0);
+    this->drawImage(tileIdMap[0], offset_x, offset_y, tileInfoMapPatch);
+    this->drawTileInfoMap(*pa, tileInfoMapPatch, 1);
+    this->drawImage(tileIdMap[1], offset_x, offset_y, tileInfoMapPatch);
+    this->drawTileInfoMap(*pa, tileInfoMapPatch, 2);
+    this->drawImage(tileIdMap[2], offset_x, offset_y, tileInfoMapPatch);
+
 
     for (y = 0; y < ordT; y++)
     {
