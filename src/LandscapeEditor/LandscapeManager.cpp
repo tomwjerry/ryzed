@@ -67,12 +67,6 @@ bool LandscapeManager::Load(const std::string& path)
     return true;
 }
 
-void LandscapeManager::parsePath(std::string& path)
-{
-    path = path.substr(path.find(":") + 1);
-    path.erase(path.find_last_not_of(" \n\r\t\,\"") + 1);
-}
-
 bool LandscapeManager::LoadZoneDir(const std::string& path);
 {
     for (const auto& entry : fs::directory_iterator(path))
@@ -121,16 +115,34 @@ bool LandscapeManager::LoadZone(const std::string& path)
     const sint zoneX(zoneId & 255);
     const sint zoneY(zoneId >> 8);
     NLMISC::CVector zoneOffset(160.0f * zoneX, -160.0f * zoneY, 0.0f);
+
     Image* tileIdMaps[TILE_LAYER_COUNT];
     this->createTileIdMap(tileIdMaps[0], TILE_ID_MAP_SIZE, TILE_ID_MAP_SIZE);
     this->createTileIdMap(tileIdMaps[1], TILE_ID_MAP_SIZE, TILE_ID_MAP_SIZE);
     this->createTileIdMap(tileIdMaps[2], TILE_ID_MAP_SIZE, TILE_ID_MAP_SIZE);
+
     for (sint patchIndex = 0; patchIndex < zone->getNumPatchs(); patchIndex++)
     {
         this->buildFaces(landscape, zoneId, patchIndex, output, tileIdMaps, normalMap);
     }
 
     return true;
+}
+
+bool LandscapeManager::PrepareRender(SDL_GPUDevice* device)
+{
+    this->createBuffer(device, this->vertices.data(),
+        this->vertices.size() * sizeof(VertexData),
+        SDL_GPU_BUFFERUSAGE_VERTEX, this->vbos[0]);
+    this->createBuffer(device, this->indexes.data(),
+        this->indexes.size() * sizeof(int),
+        SDL_GPU_BUFFERUSAGE_INDEX, this->vbos[1]);
+}
+
+void LandscapeManager::parsePath(std::string& path)
+{
+    path = path.substr(path.find(":") + 1);
+    path.erase(path.find_last_not_of(" \n\r\t\,\"") + 1);
 }
 
 uint8 LandscapeManager::getPatchTileIndex(const NL3D::CPatch& patch, const uint8 s, const uint8 t)
@@ -330,86 +342,91 @@ void LandscapeManager::buildFaces(
             NL3D::CVector nb(bezierPatch.evalNormal(x * OOS, (y + 1) * OOT));
             NL3D::CVector nc(bezierPatch.evalNormal((x + 1) * OOS, (y + 1) * OOT));
             NL3D::CVector nd(bezierPatch.evalNormal((x + 1) * OOS, y * OOT));
-
-            std::vector<VertexData> vertices;
-            VertexData vert;
-            vertices.push_back({
+        
+            this->vertices.push_back({
                 va,
                 na,
                 a,
                 {
                     {
                         tile.Tile[0],
-                        tileUV(A, tile.getTileOrient(0), is256, uvOff)
+                        this->tileUV(A, tile.getTileOrient(0), is256, uvOff)
                     },
                     {
                         tile.Tile[1],
-                        tileUV(A, tile.getTileOrient(1), is256, uvOff)
+                        this->tileUV(A, tile.getTileOrient(1), is256, uvOff)
                     },
                     {
                         tile.Tile[2],
-                        tileUV(A, tile.getTileOrient(2), is256, uvOff)
+                        this->tileUV(A, tile.getTileOrient(2), is256, uvOff)
                     }
                 }
             });
-            vertices.push_back({
+            this->vertices.push_back({
                 vb,
                 nb,
                 b,
                 {
                     {
                         tile.Tile[0],
-                        tileUV(B, tile.getTileOrient(0), is256, uvOff)
+                        this->tileUV(B, tile.getTileOrient(0), is256, uvOff)
                     },
                     {
                         tile.Tile[1],
-                        tileUV(B, tile.getTileOrient(1), is256, uvOff)
+                        this->tileUV(B, tile.getTileOrient(1), is256, uvOff)
                     },
                     {
                         tile.Tile[2],
-                        tileUV(B, tile.getTileOrient(2), is256, uvOff)
+                        this->tileUV(B, tile.getTileOrient(2), is256, uvOff)
                     }
                 }
             });
-            vertices.push_back({
+            this->vertices.push_back({
                 vc,
                 nc,
                 c,
                 {
                     {
                         tile.Tile[0],
-                        tileUV(C, tile.getTileOrient(0), is256, uvOff) },
+                        this->tileUV(C, tile.getTileOrient(0), is256, uvOff) },
                     {
                         tile.Tile[1],
-                        tileUV(C, tile.getTileOrient(1), is256, uvOff) },
+                        this->tileUV(C, tile.getTileOrient(1), is256, uvOff) },
                     {
                         tile.Tile[2],
-                        tileUV(C, tile.getTileOrient(2), is256, uvOff)
+                        this->tileUV(C, tile.getTileOrient(2), is256, uvOff)
                     }
                 }
             });
-            vertices.push_back({
+            this->vertices.push_back({
                 vd,
                 nd,
                 d,
                 {
                     {
                         tile.Tile[0],
-                        tileUV(D, tile.getTileOrient(0), is256, uvOff) },
+                        this->tileUV(D, tile.getTileOrient(0), is256, uvOff) },
                     {
                         tile.Tile[1],
-                        tileUV(D, tile.getTileOrient(1), is256, uvOff) },
+                        this->tileUV(D, tile.getTileOrient(1), is256, uvOff) },
                     {
                         tile.Tile[2],
-                        .uv = tileUV(D, tile.getTileOrient(2), is256, uvOff)
+                        this->tileUV(D, tile.getTileOrient(2), is256, uvOff)
                     }
                 }
             });
+
+            this->indexes.push_back(0);
+            this->indexes.push_back(1);
+            this->indexes.push_back(2);
+            this->indexes.push_back(0);
+            this->indexes.push_back(2);
+            this->indexes.push_back(3);
         }
     }
 }
 
-void LandscapeManager::addZone(CLandscape& landscape,
+void LandscapeManager::addZone(NL3D::CLandscape& landscape,
     const std::string& zoneSearchDirectory,
     const sint x, const sint y)
 {
@@ -417,11 +434,11 @@ void LandscapeManager::addZone(CLandscape& landscape,
     zoneFilename += zoneName(x, y);
     zoneFilename += ".zonel";
 
-    CIFile zoneFile;
+    NLMISC::CIFile zoneFile;
     if (zoneFile.open(zoneFilename))
     {
         nlinfo("Found Neighbor Zone: %s", zoneFilename.c_str());
-        CZone zone;
+        NL3D::CZone zone;
         zone.serial(zoneFile);
         landscape.addZone(zone);
         zoneFile.close();
@@ -434,35 +451,35 @@ void LandscapeManager::addZone(CLandscape& landscape,
     if (zoneFile.open(zoneFilename))
     {
         nlinfo("Found Neighbor Zone: %s", zoneFilename.c_str());
-        CZone zone;
+        NL3D::CZone zone;
         zone.serial(zoneFile);
         landscape.addZone(zone);
         zoneFile.close();
     }
 }
 
-void LandscapeManager::addNeighborZones(CLandscape& landscape, const uint16& zoneId,
+void LandscapeManager::addNeighborZones(NL3D::CLandscape& landscape, const uint16& zoneId,
     const std::string& zoneSearchDirectory)
 {
     const sint x(zoneId & 255);
     const sint y(zoneId >> 8);
 
-    addZone(landscape, zoneSearchDirectory, x - 1, y - 1);
-    addZone(landscape, zoneSearchDirectory, x + 0, y - 1);
-    addZone(landscape, zoneSearchDirectory, x + 1, y - 1);
-    addZone(landscape, zoneSearchDirectory, x - 1, y + 0);
-    addZone(landscape, zoneSearchDirectory, x + 0, y + 0);
-    addZone(landscape, zoneSearchDirectory, x + 1, y + 0);
-    addZone(landscape, zoneSearchDirectory, x - 1, y + 1);
-    addZone(landscape, zoneSearchDirectory, x + 0, y + 1);
-    addZone(landscape, zoneSearchDirectory, x + 1, y + 1);
+    this->addZone(landscape, zoneSearchDirectory, x - 1, y - 1);
+    this->addZone(landscape, zoneSearchDirectory, x + 0, y - 1);
+    this->addZone(landscape, zoneSearchDirectory, x + 1, y - 1);
+    this->addZone(landscape, zoneSearchDirectory, x - 1, y + 0);
+    this->addZone(landscape, zoneSearchDirectory, x + 0, y + 0);
+    this->addZone(landscape, zoneSearchDirectory, x + 1, y + 0);
+    this->addZone(landscape, zoneSearchDirectory, x - 1, y + 1);
+    this->addZone(landscape, zoneSearchDirectory, x + 0, y + 1);
+    this->addZone(landscape, zoneSearchDirectory, x + 1, y + 1);
 }
 
-void LandscapeManager::loadTileBank(CLandscape& landscape, const std::string& bankFilePath)
+void LandscapeManager::loadTileBank(NL3D::CLandscape& landscape, const std::string& bankFilePath)
 {
     if (!bankFilePath.empty())
     {
-        CIFile bankFile(bankFilePath);
+        NLMISC::CIFile bankFile(bankFilePath);
         auto &tileBank = landscape.TileBank;
         tileBank.serial(bankFile);
         nldebug("TileBank land count %i", tileBank.getLandCount());
@@ -471,14 +488,14 @@ void LandscapeManager::loadTileBank(CLandscape& landscape, const std::string& ba
     }
 }
 
-SDL_GPUBuffer* LandscapeManager::createBuffer(
+void LandscapeManager::createBuffer(
     SDL_GPUDevice* device, const void* data, size_t size,
-    SDL_GPUBufferUsageFlags usage)
+    SDL_GPUBufferUsageFlags usage, SDL_GPUBuffer* buffer)
 {
     SDL_GPUBufferCreateInfo bufferCreateInfo = SDL_GPUBufferCreateInfo();
     bufferCreateInfo.usage = usage;
     bufferCreateInfo.size = static_cast<Uint32>(size);
-    SDL_GPUBuffer* buffer = SDL_CreateGPUBuffer(device, &bufferCreateInfo);
+    buffer = SDL_CreateGPUBuffer(device, &bufferCreateInfo);
     
     SDL_GPUTransferBufferCreateInfo transferInfo = SDL_GPUTransferBufferCreateInfo();
     transferInfo.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
@@ -508,6 +525,4 @@ SDL_GPUBuffer* LandscapeManager::createBuffer(
     SDL_SubmitGPUCommandBuffer(cmd);
 
     SDL_ReleaseGPUTransferBuffer(device, transferBuffer);
-
-    return buffer;
 }
