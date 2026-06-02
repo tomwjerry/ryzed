@@ -148,6 +148,10 @@ bool LandscapeManager::LoadZone(const std::string& path)
         this->buildFaces(landscape, zoneId, patchIndex);
     }
 
+    this->uploadTexture(this->tileIdMaps[0]);
+    this->uploadTexture(this->tileIdMaps[1]);
+    this->uploadTexture(this->tileIdMaps[2]);
+
     return true;
 }
 
@@ -701,4 +705,38 @@ void LandscapeManager::createBuffer(
     SDL_SubmitGPUCommandBuffer(cmd);
 
     SDL_ReleaseGPUTransferBuffer(device, transferBuffer);
+}
+
+void LandscapeManager::uploadTexture(Image* image)
+{
+    SDL_GPUTransferBufferCreateInfo transferInfo;
+    transferInfo.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
+    transferInfo.size = static_cast<Uint32>(image->pixels.size());
+    SDL_GPUTransferBuffer* transferBuffer =
+        SDL_CreateGPUTransferBuffer(this->device, &transferInfo);
+
+    void* transferData = SDL_MapGPUTransferBuffer(this->device, transferBuffer, false);
+    memcpy(transferData, image->pixels.data(), image->pixels.size());
+    SDL_UnmapGPUTransferBuffer(this->device, transferBuffer);
+
+    SDL_GPUCommandBuffer* cmd = SDL_AcquireGPUCommandBuffer(this->device);
+    SDL_GPUCopyPass* copyPass = SDL_BeginGPUCopyPass(cmd);
+
+    SDL_GPUTextureTransferInfo src;
+    src.transfer_buffer = transferBuffer;
+    src.offset = 0;
+
+    SDL_GPUTextureRegion dst;
+    dst.texture = image->texture.get();
+    dst.layer = 0;
+    dst.w = static_cast<Uint32>(image->width);
+    dst.h = static_cast<Uint32>(image->height);
+    dst.d = 1;
+    SDL_UploadToGPUTexture(copyPass, &src, &dst, false);
+
+    SDL_EndGPUCopyPass(copyPass);
+    image->GenerateMipmaps(cmd);
+    SDL_SubmitGPUCommandBuffer(cmd);
+
+    SDL_ReleaseGPUTransferBuffer(this->device, transferBuffer);
 }

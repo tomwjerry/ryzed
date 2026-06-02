@@ -117,5 +117,7 @@ void Renderer::Render()
         }
         
         SDL_EndGPURenderPass(renderPass);
+
+        SDL_SubmitGPUCommandBuffer(cmd);
     }
 }

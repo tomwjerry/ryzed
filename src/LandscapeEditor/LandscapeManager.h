@@ -80,6 +80,7 @@ private:
     void createBuffer(
         const void* data, size_t size,
         SDL_GPUBufferUsageFlags usage, SDL_GPUBuffer* buffer);
+    void uploadTexture(Image* image);
 
 public:
     LandscapeManager(SDL_GPUDevice* device, const std::string& cfgFile);
