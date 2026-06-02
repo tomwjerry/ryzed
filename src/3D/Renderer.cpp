@@ -5,96 +5,117 @@
  * Copyright (C) 2024 Caleb Cornett <caleb.cornett@outlook.com> (zlib Licence)
  */
 
-Renderer::Renderer(SDL_GPUDevice* device)
+Renderer::Renderer(SDL_GPUDevice* device, SDL_Window* window)
 {
     this->device = device;
+    this->window = window;
 }
 
-Renderer::Init()
+void Renderer::Init()
 {
-    Shader* landscapeVert = new Shader();
-    landscapeVert->Load("General.vert");
-    Shader* landscapeFrag = new Shader();
-    landscapeFrag->Load("General.frag");
+    this->cmd = SDL_AcquireGPUCommandBuffer(this->device);
 
-    // Set up pipeline
-    SDL_GPUTextureFormat colorTargetFormat = SDL_GPU_TEXTUREFORMAT_R16G16B16A16_FLOAT;
-    SDL_GPUTextureFormat depthTargetFormat = SDL_GPU_TEXTUREFORMAT_D32_FLOAT;
-    SDL_GPUTextureFormat swapchainImageFormat = SDL_GetGPUSwapchainTextureFormat(device, window);
-    SDL_GPUSampleCount msaaSampleCount = SDL_GPU_SAMPLECOUNT_4;
-    if (!SDL_GPUTextureSupportsSampleCount(device, colorTargetFormat, msaaSampleCount))
+    int windowWidth;
+    int windowHeight;
+    SDL_GetWindowSize(this->window, &windowWidth, &windowHeight);
+
+    this->camera = new Camera(Vector3(0.0f, 0.5f, -5.0f),
+        Vector3(0.0f, 0.5f, 0.0f),
+        Vector3(0.0f, 1.0f, 0.0f),
+        Math::Radians(60.0f),
+        windowWidth / (float)windowHeight,
+        0.1f,
+        500.0f);
+
+    SDL_GPUTextureCreateInfo msaaTextureCreateInfo; 
+    msaaTextureCreateInfo.type = SDL_GPU_TEXTURETYPE_2D;
+    msaaTextureCreateInfo.format = SDL_GPU_TEXTUREFORMAT_R16G16B16A16_FLOAT;
+    msaaTextureCreateInfo.usage = SDL_GPU_TEXTUREUSAGE_COLOR_TARGET;
+    msaaTextureCreateInfo.width = static_cast<uint32_t>(windowWidth);
+    msaaTextureCreateInfo.height = static_cast<uint32_t>(windowHeight);
+    msaaTextureCreateInfo.layer_count_or_depth = 1;
+    msaaTextureCreateInfo.num_levels = 1;
+    msaaTextureCreateInfo.sample_count = SDL_GPU_SAMPLECOUNT_4;
+    this->msaaTexture = SDL_CreateGPUTexture(device, &msaaTextureCreateInfo);
+
+    SDL_GPUTextureCreateInfo depthTextureCreateInfo;
+    depthTextureCreateInfo.type = SDL_GPU_TEXTURETYPE_2D;
+    depthTextureCreateInfo.format = SDL_GPU_TEXTUREFORMAT_D32_FLOAT;
+    depthTextureCreateInfo.usage = SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET;
+    depthTextureCreateInfo.width = static_cast<uint32_t>(windowWidth);
+    depthTextureCreateInfo.height = static_cast<uint32_t>(windowHeight);
+    depthTextureCreateInfo.layer_count_or_depth = 1;
+    depthTextureCreateInfo.num_levels = 1;
+    depthTextureCreateInfo.sample_count = SDL_GPU_SAMPLECOUNT_4; // Must match color target sample count
+    this->depthTexture = SDL_CreateGPUTexture(device, &depthTextureCreateInfo);
+
+    SDL_GPUTextureCreateInfo resolveTextureCreateInfo;
+    resolveTextureCreateInfo.type = SDL_GPU_TEXTURETYPE_2D;
+    resolveTextureCreateInfo.format = SDL_GPU_TEXTUREFORMAT_R16G16B16A16_FLOAT;
+    resolveTextureCreateInfo.usage = SDL_GPU_TEXTUREUSAGE_COLOR_TARGET | SDL_GPU_TEXTUREUSAGE_SAMPLER;
+    resolveTextureCreateInfo.width = static_cast<uint32_t>(windowWidth);
+    resolveTextureCreateInfo.height = static_cast<uint32_t>(windowHeight);
+    resolveTextureCreateInfo.layer_count_or_depth = 1;
+    resolveTextureCreateInfo.num_levels = 1;
+    this->resolveTexture = SDL_CreateGPUTexture(device, &resolveTextureCreateInfo);
+
+    SDL_GPUSamplerCreateInfo samplerCreateInfo;
+    samplerCreateInfo.min_filter = SDL_GPU_FILTER_LINEAR;
+    samplerCreateInfo.mag_filter = SDL_GPU_FILTER_LINEAR;
+    samplerCreateInfo.mipmap_mode = SDL_GPU_SAMPLERMIPMAPMODE_LINEAR;
+    samplerCreateInfo.address_mode_u = SDL_GPU_SAMPLERADDRESSMODE_MIRRORED_REPEAT;
+    samplerCreateInfo.address_mode_v = SDL_GPU_SAMPLERADDRESSMODE_MIRRORED_REPEAT;
+    samplerCreateInfo.max_anisotropy = 4;
+    samplerCreateInfo.min_lod = 0.0f;
+    samplerCreateInfo.max_lod = 200.0f;
+    samplerCreateInfo.enable_anisotropy = true;
+    this->sampler = SDL_CreateGPUSampler(device, &samplerCreateInfo);
+}
+
+void Renderer::AddRenderable(IRenderable* renderable)
+{
+    this->renderables.push_back(renderable);
+}
+
+void Renderer::Render()
+{
+    SDL_GPUTexture* swapchainTexture;
+    if (!SDL_WaitAndAcquireGPUSwapchainTexture(this->cmd, this->window, &swapchainTexture, NULL, NULL))
     {
-		SDL_Log("Sample count %d is not supported", (1 << static_cast<int>(msaaSampleCount)));
-        msaaSampleCount = SDL_GPU_SAMPLECOUNT_4;
-	}
-
-    SDL_GPUVertexBufferDescription landscapeVBD[2] = {{
-        0,
-        sizeof(float[3]),
-        SDL_GPU_VERTEXINPUTRATE_VERTEX,
-        0
-    },
+        SDL_Log("WaitAndAcquireGPUSwapchainTexture1 failed: %s", SDL_GetError());
+        return;
+    }
+    if (swapchainTexture != NULL)
     {
-        1,
-        sizeof(float[2]),
-        SDL_GPU_VERTEXINPUTRATE_VERTEX,
-        0
-    }};
+        SDL_GPUColorTargetInfo colorTargetInfo = { 0 };
+        colorTargetInfo.texture = this->msaaTexture;
+        colorTargetInfo.clear_color = SDL_FColor{ 0.0f, 0.5f, 1.0f, 1.0f };
+        colorTargetInfo.load_op = SDL_GPU_LOADOP_CLEAR;
+        colorTargetInfo.store_op = SDL_GPU_STOREOP_RESOLVE;
+        colorTargetInfo.resolve_texture = this->resolveTexture;
 
-    SDL_GPUVertexAttributeDescription landscapeVA[2] = {{
-        0,
-        0,
-        SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3,
-        0
-    },
-    {
-        1,
-        0,
-        SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2,
-        0
-    }};
+        SDL_GPUDepthStencilTargetInfo depthTargetInfo = { 0 };
+        depthTargetInfo.texture = this->depthTexture;
+        depthTargetInfo.clear_depth = 1.0f;
+        depthTargetInfo.load_op = SDL_GPU_LOADOP_CLEAR;
+        depthTargetInfo.store_op = SDL_GPU_STOREOP_STORE;
 
-    SDL_GPUGraphicsPipelineCreateInfo landscapePipelineInfo;
-    landscapePipelineInfo.vertex_shader = landscapeVert->Get();
-	landscapePipelineInfo.fragment_shader = landscapeFrag->Get();
-    
-    landscapePipelineInfo.vertex_input_state = SDL_GPUVertexInputState();
-    landscapePipelineInfo.vertex_input_state.vertex_buffer_descriptions = landscapeVBD;
-    landscapePipelineInfo.vertex_input_state.num_vertex_buffers = 2;
-    landscapePipelineInfo.vertex_input_state.vertex_attributes = landscapeVA;
-    landscapePipelineInfo.vertex_input_state.num_vertex_attributes = 2;
+        SDL_GPURenderPass* renderPass = SDL_BeginGPURenderPass(
+            cmd, &colorTargetInfo, 1, &depthTargetInfo);
 
-    landscapePipelineInfo.primitive_type = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST;
-    
-    landscapePipelineInfo.rasterizer_state = SDL_GPURasterizerState();
-    landscapePipelineInfo.rasterizer_state.cull_mode = SDL_GPU_CULLMODE_BACK;
-    landscapePipelineInfo.rasterizer_state.front_face = SDL_GPU_FRONTFACE_CLOCKWISE;
-    landscapePipelineInfo.rasterizer_state.fill_mode = SDL_GPU_FILLMODE_FILL;
+        MVP camInfo;
+        camInfo.view = this->camera->GetViewMatrix();
+        camInfo.proj = this->camera->GetProjMatrix();
+        Vector3 cameraPos = this->camera->GetEye();
 
-    landscapePipelineInfo.multisample_state = SDL_GPUMultisampleState();
-    landscapePipelineInfo.multisample_state.sample_count = msaaSampleCount;
-    
-    landscapePipelineInfo.depth_stencil_state = SDL_GPUDepthStencilState();
-    landscapePipelineInfo.depth_stencil_state.compare_op = SDL_GPU_COMPAREOP_LESS;
-    landscapePipelineInfo.depth_stencil_state.depth_write_enable = true;
-    landscapePipelineInfo.depth_stencil_state.stencil_write_enable = true;
-    
-    landscapePipelineInfo.target_info = SDL_GPUGraphicsPipelineTargetInfo();
-    landscapePipelineInfo.target_info.color_target_descriptions = SDL_GPUColorTargetDescription[1];
-    landscapePipelineInfo.target_info.color_target_descriptions[0].format = colorTargetFormat;
-    landscapePipelineInfo.target_info.num_color_targets = 1;
-    landscapePipelineInfo.target_info.depth_stencil_format = depthTargetFormat;
-    landscapePipelineInfo.target_info.has_depth_stencil_target = true;
+        SDL_PushGPUVertexUniformData(cmd, 0, &camInfo, sizeof(MVP));
+        //SDL_PushGPUFragmentUniformData(cmd, 0, &cameraPos, sizeof(float[3])); // For lightning
 
-    SDL_GPUGraphicsPipeline* landscapePipeline =
-        SDL_CreateGPUGraphicsPipeline(device, &landscapePipelineInfo);
-	if (landscapePipeline == NULL)
-    {
-		SDL_Log("Failed to create textured fill pipeline!");
-		return -1;
-	}
-
-    // Release shaders
-    landscapeVert->Release(device);
-    landscapeFrag->Release(device);
+        for (const auto renderable : this->renderables)
+        {
+            renderable->Render(renderPass, cmd, sampler);
+        }
+        
+        SDL_EndGPURenderPass(renderPass);
+    }
 }

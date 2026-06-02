@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.16)
 project(ryzed)
 
 find_package(SDL3)
+find_package(SDL3_shadercross)
 find_package(JPEG)
 find_package(GIF)
 find_package(PNG)
@@ -19,13 +20,21 @@ add_executable(ryzed
     ${IMGUI_DIR}/imgui_widgets.cpp
     ${IMGUI_DIR}/backends/imgui_impl_sdl3.cpp
     ${IMGUI_DIR}/backends/imgui_impl_sdlgpu3.cpp
+    src/Math.cpp
+    src/3D/Camera.cpp
+    src/3D/Image.cpp
     src/LandscapeEditor/LandscapeManager.cpp
     src/UI/UIManager.cpp
+    src/3D/Shader.cpp
+    src/3D/Renderer.cpp
     src/main.cpp)
+
+set_property(TARGET ryzed PROPERTY CXX_STANDARD 17)
 
 target_include_directories(ryzed PRIVATE ${IMGUI_DIR})
 target_include_directories(ryzed PRIVATE "third_party")
 
+target_link_libraries(ryzed PRIVATE SDL3_shadercross::SDL3_shadercross)
 target_link_libraries(ryzed PRIVATE SDL3::SDL3)
 target_link_libraries(ryzed PRIVATE NeL::misc)
 target_link_libraries(ryzed PRIVATE NeL::ligo)

@@ -1,4 +1,4 @@
-#include "image.hpp"
+#include "Image.h"
 #include <SDL3/SDL.h>
 #include <cmath>
 
@@ -11,14 +11,13 @@ void Image::Prepare(SDL_GPUDevice* device)
     this->num_levels = std::max(1u, static_cast<Uint32>(
         std::floor(std::log2(std::min(width, height)))));
 
-    SDL_GPUTextureCreateInfo textureDesc = {
-        .type = SDL_GPU_TEXTURETYPE_2D,
-        .usage = SDL_GPU_TEXTUREUSAGE_SAMPLER | SDL_GPU_TEXTUREUSAGE_COLOR_TARGET,
-        .width = static_cast<Uint32>(width),
-        .height = static_cast<Uint32>(height),
-        .layer_count_or_depth = 1,
-        .num_levels = num_levels,
-    };
+    SDL_GPUTextureCreateInfo textureDesc;
+	textureDesc.type = SDL_GPU_TEXTURETYPE_2D;
+	textureDesc.usage = SDL_GPU_TEXTUREUSAGE_SAMPLER | SDL_GPU_TEXTUREUSAGE_COLOR_TARGET;
+	textureDesc.width = static_cast<Uint32>(width);
+	textureDesc.height = static_cast<Uint32>(height);
+	textureDesc.layer_count_or_depth = 1;
+	textureDesc.num_levels = num_levels;
     if (this->component == 1)
     {
         textureDesc.format = SDL_GPU_TEXTUREFORMAT_R8_UNORM;
@@ -26,10 +25,6 @@ void Image::Prepare(SDL_GPUDevice* device)
     else if (this->component == 2)
     {
         textureDesc.format = SDL_GPU_TEXTUREFORMAT_R8G8_UNORM;
-    }
-    else if (this->component == 3)
-    {
-        textureDesc.format = SDL_GPU_TEXTUREFORMAT_R8G8B8_UNORM;
     }
     else if (this->component == 4)
     {
@@ -59,17 +54,17 @@ void Image::Upload(SDL_GPUDevice* device, SDL_GPUCopyPass* copyPass,
     SDL_GPUTransferBuffer* transferBuffer, Uint32 offset)
 {
     SDL_GPUTextureTransferInfo src = {
-        .transfer_buffer = transferBuffer,
-        .offset = offset
+        transferBuffer,
+        offset
     };
     SDL_GPUTextureRegion dst = {
-        .texture = this->texture,
-        .layer = 0,
-        .x = 0,
-        .y = 0,
-        .w = static_cast<Uint32>(this->width),
-        .h = static_cast<Uint32>(hthis->eight),
-        .d = 1
+        this->texture,
+        0,
+        0,
+        0,
+        static_cast<Uint32>(this->width),
+        static_cast<Uint32>(this->height),
+        1
     };
     SDL_UploadToGPUTexture(copyPass, &src, &dst, false);
 }

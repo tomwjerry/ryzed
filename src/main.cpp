@@ -5,13 +5,14 @@
 #include <stdlib.h>         // abort
 #include <SDL3/SDL.h>
 #define SDL_GPU_SHADERCROSS_IMPLEMENTATION
-#include "SDL_gpu_shadercross.h"
+#include <SDL3_shadercross/SDL_shadercross.h>
 
 // This example doesn't compile with Emscripten yet! Awaiting SDL3 support.
 #ifdef __EMSCRIPTEN__
 #include "../libs/emscripten/emscripten_mainloop_stub.h"
 #endif
 
+#include "3D/Renderer.h"
 #include "LandscapeEditor/LandscapeManager.h"
 #include "UI/UIManager.h"
 
@@ -106,8 +107,8 @@ int main(int, char**)
     // - Read 'docs/FONTS.md' for more instructions and details.
     // - Use '#define IMGUI_ENABLE_FREETYPE' in your imconfig file to use 
     // FreeType for higher quality font rendering.
-    // - Remember that in C/C++ if you want to include a backslash \ 
-    // in a string literal you need to write a double backslash \\ !
+    // - Remember that in C/C++ if you want to include a backslash \ in
+    // a string literal you need to write a double backslash \\ !
     //style.FontSizeBase = 20.0f;
     //io.Fonts->AddFontDefaultVector();
     //io.Fonts->AddFontDefaultBitmap();
@@ -121,21 +122,28 @@ int main(int, char**)
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
     NLMISC::CApplicationContext myApplicationContext;
-    NLLIGO::Register();
+    //NLLIGO::Register();
     /*NLLIGO::CLigoConfig LigoConfig;
     NLLIGO::CPrimitiveContext::instance().CurrentLigoConfig = &LigoConfig;
     NLLIGO::CPrimitives primDoc;
     NLLIGO::CPrimitiveContext::instance().CurrentPrimitive = &primDoc;
     */
     bool done = false;
-    LandscapeManager* landscapeManager = new LandscapeManager("world_editor_classes.xml");
+    LandscapeManager* landscapeManager = new LandscapeManager(
+        gpu_device, "world_editor_classes.xml");
+    landscapeManager->LoadShaders(window);
+
     UIManager* ryzUI = new UIManager(&io);
     ryzUI->RegisterLandscapeFileSelCB([landscapeManager](const std::string& path)
     {
-        landscapeManager->LoadLandscapePrimitive(path);
+        landscapeManager->LoadZone(path);
+        landscapeManager->PrepareRender();
     });
 
-    // Main loop
+    Renderer* renderer = new Renderer(gpu_device, window);
+    renderer->Init();
+    renderer->AddRenderable(landscapeManager);
+
     // Main loop
     while (!done)
     {
@@ -175,6 +183,8 @@ int main(int, char**)
         ImGui_ImplSDLGPU3_NewFrame();
         ImGui_ImplSDL3_NewFrame();
         ImGui::NewFrame();
+
+        renderer->Render();
 
         ryzUI->Render();
 

@@ -8,11 +8,7 @@ private:
 
 public:
     void Load(SDL_GPUDevice* device,
-        const char* shaderFilename,
-        Uint32 samplerCount,
-        Uint32 uniformBufferCount,
-        Uint32 storageBufferCount,
-        Uint32 storageTextureCount);
-    void Release();
-    SDL_GPUShader* GetShader(SDL_GPUDevice* device);
+        const char* shaderFilename);
+    void Release(SDL_GPUDevice* device);
+    SDL_GPUShader* GetShader();
 };

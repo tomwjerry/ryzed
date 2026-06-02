@@ -1,2 +1,5 @@
 build
 out
+*.stamp*
+*.vcxproj*
+*.slnx

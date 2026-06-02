@@ -1,6 +1,6 @@
 #pragma once
 
-#include "SDL3/SDL_gpu.h"
+#include <SDL3/SDL.h>
 #include <string>
 #include <vector>
 #include <memory>
@@ -17,7 +17,7 @@ public:
     Uint32 width;
     Uint32 height;
     Uint32 component;
-    std::vector<Uint8> pixels;
+    std::vector<Uint64> pixels;
     Uint32 num_levels = 1;
     SDL_GPUTexture* texture;
 

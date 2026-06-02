@@ -5,3 +5,4 @@
 [submodule "third_party/filedialog"]
 	path = third_party/filedialog
 	url = https://github.com/btzy/nativefiledialog-extended.git
+    ignore = dirty
