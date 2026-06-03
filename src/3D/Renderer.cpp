@@ -13,8 +13,6 @@ Renderer::Renderer(SDL_GPUDevice* device, SDL_Window* window)
 
 void Renderer::Init()
 {
-    this->cmd = SDL_AcquireGPUCommandBuffer(this->device);
-
     int windowWidth;
     int windowHeight;
     SDL_GetWindowSize(this->window, &windowWidth, &windowHeight);
@@ -27,7 +25,7 @@ void Renderer::Init()
         0.1f,
         500.0f);
 
-    SDL_GPUTextureCreateInfo msaaTextureCreateInfo; 
+    SDL_GPUTextureCreateInfo msaaTextureCreateInfo = SDL_GPUTextureCreateInfo();
     msaaTextureCreateInfo.type = SDL_GPU_TEXTURETYPE_2D;
     msaaTextureCreateInfo.format = SDL_GPU_TEXTUREFORMAT_R16G16B16A16_FLOAT;
     msaaTextureCreateInfo.usage = SDL_GPU_TEXTUREUSAGE_COLOR_TARGET;
@@ -38,7 +36,7 @@ void Renderer::Init()
     msaaTextureCreateInfo.sample_count = SDL_GPU_SAMPLECOUNT_4;
     this->msaaTexture = SDL_CreateGPUTexture(device, &msaaTextureCreateInfo);
 
-    SDL_GPUTextureCreateInfo depthTextureCreateInfo;
+    SDL_GPUTextureCreateInfo depthTextureCreateInfo = SDL_GPUTextureCreateInfo();
     depthTextureCreateInfo.type = SDL_GPU_TEXTURETYPE_2D;
     depthTextureCreateInfo.format = SDL_GPU_TEXTUREFORMAT_D32_FLOAT;
     depthTextureCreateInfo.usage = SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET;
@@ -49,7 +47,7 @@ void Renderer::Init()
     depthTextureCreateInfo.sample_count = SDL_GPU_SAMPLECOUNT_4; // Must match color target sample count
     this->depthTexture = SDL_CreateGPUTexture(device, &depthTextureCreateInfo);
 
-    SDL_GPUTextureCreateInfo resolveTextureCreateInfo;
+    SDL_GPUTextureCreateInfo resolveTextureCreateInfo = SDL_GPUTextureCreateInfo();
     resolveTextureCreateInfo.type = SDL_GPU_TEXTURETYPE_2D;
     resolveTextureCreateInfo.format = SDL_GPU_TEXTUREFORMAT_R16G16B16A16_FLOAT;
     resolveTextureCreateInfo.usage = SDL_GPU_TEXTUREUSAGE_COLOR_TARGET | SDL_GPU_TEXTUREUSAGE_SAMPLER;
@@ -59,7 +57,7 @@ void Renderer::Init()
     resolveTextureCreateInfo.num_levels = 1;
     this->resolveTexture = SDL_CreateGPUTexture(device, &resolveTextureCreateInfo);
 
-    SDL_GPUSamplerCreateInfo samplerCreateInfo;
+    SDL_GPUSamplerCreateInfo samplerCreateInfo = SDL_GPUSamplerCreateInfo();
     samplerCreateInfo.min_filter = SDL_GPU_FILTER_LINEAR;
     samplerCreateInfo.mag_filter = SDL_GPU_FILTER_LINEAR;
     samplerCreateInfo.mipmap_mode = SDL_GPU_SAMPLERMIPMAPMODE_LINEAR;
@@ -79,8 +77,10 @@ void Renderer::AddRenderable(IRenderable* renderable)
 
 void Renderer::Render()
 {
+    SDL_GPUCommandBuffer* cmd = SDL_AcquireGPUCommandBuffer(this->device);
+
     SDL_GPUTexture* swapchainTexture;
-    if (!SDL_WaitAndAcquireGPUSwapchainTexture(this->cmd, this->window, &swapchainTexture, NULL, NULL))
+    if (!SDL_WaitAndAcquireGPUSwapchainTexture(cmd, this->window, &swapchainTexture, NULL, NULL))
     {
         SDL_Log("WaitAndAcquireGPUSwapchainTexture1 failed: %s", SDL_GetError());
         return;
@@ -103,12 +103,12 @@ void Renderer::Render()
         SDL_GPURenderPass* renderPass = SDL_BeginGPURenderPass(
             cmd, &colorTargetInfo, 1, &depthTargetInfo);
 
-        MVP camInfo;
+        CameraInfo camInfo;
         camInfo.view = this->camera->GetViewMatrix();
         camInfo.proj = this->camera->GetProjMatrix();
         Vector3 cameraPos = this->camera->GetEye();
 
-        SDL_PushGPUVertexUniformData(cmd, 0, &camInfo, sizeof(MVP));
+        SDL_PushGPUVertexUniformData(cmd, 0, &camInfo, sizeof(CameraInfo));
         //SDL_PushGPUFragmentUniformData(cmd, 0, &cameraPos, sizeof(float[3])); // For lightning
 
         for (const auto renderable : this->renderables)

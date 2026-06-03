@@ -10,7 +10,11 @@
 #include <iostream>
 #include <sstream>
 
+#include "nel/3d/bezier_patch.h"
+#include "nel/3d/nelu.h"
+#include "nel/3d/tile_bank.h"
 #include "nel/ligo/primitive_utils.h"
+#include "nel/ligo/zone_region.h"
 #include "nel/misc/path.h"
 #include "nel/misc/config_file.h"
 #include "nel/misc/file.h"
@@ -20,34 +24,37 @@
 #include "nel/misc/common.h"
 #include "nel/misc/cmd_args.h"
 #include "nel/misc/bitmap.h"
-#include "nel/3d/bezier_patch.h"
-#include "nel/ligo/zone_region.h"
 
 LandscapeManager::LandscapeManager(SDL_GPUDevice* device, const std::string& cfgFile)
 {
+    this->tileBank = new NL3D::CTileBank;
+    this->landscape = new NL3D::CLandscape;
+
     this->device = device;
 
-    this->worldTransform[0] = 1.0f;
-    this->worldTransform[1] = 0.0f;
-    this->worldTransform[2] = 0.0f;
-    this->worldTransform[3] = 0.0f;
-    this->worldTransform[4] = 1.0f;
-    this->worldTransform[5] = 0.0f;
-    this->worldTransform[6] = 0.0f;
-    this->worldTransform[7] = 0.0f;
-    this->worldTransform[8] = 1.0f;
-    this->worldTransform[9] = 0.0f;
-    this->worldTransform[10] = 0.0f;
-    this->worldTransform[11] = 0.0f;
-    this->worldTransform[12] = 0.0f;
-    this->worldTransform[13] = 0.0f;
-    this->worldTransform[14] = 0.0f;
-    this->worldTransform[15] = 1.0f;
+    this->worldTransform.m0 = 1.0f;
+    this->worldTransform.m1 = 0.0f;
+    this->worldTransform.m2 = 0.0f;
+    this->worldTransform.m3 = 0.0f;
+    this->worldTransform.m4 = 1.0f;
+    this->worldTransform.m5 = 0.0f;
+    this->worldTransform.m6 = 0.0f;
+    this->worldTransform.m7 = 0.0f;
+    this->worldTransform.m8 = 1.0f;
+    this->worldTransform.m9 = 0.0f;
+    this->worldTransform.m10 = 0.0f;
+    this->worldTransform.m11 = 0.0f;
+    this->worldTransform.m12 = 0.0f;
+    this->worldTransform.m13 = 0.0f;
+    this->worldTransform.m14 = 0.0f;
+    this->worldTransform.m15 = 1.0f;
 
     NLMISC::CPath::addSearchPath("D:/ryzed/build/Debug");
-    NLMISC::CPath::addSearchPath("D:/ryzomcore-quickstart-4.0-pre3/leveldesign/primitives");
+    NLMISC::CPath::addSearchPath(
+        "D:/ryzomcore-quickstart-4.0-pre3/leveldesign/primitives");
 
-    this->tileBankFilePath = "D:/ryzomcore-quickstart-4.0-pre3/pipeline/install/desert_bank/desert.smallbank";
+    this->tileBankFilePath =
+        "D:/ryzomcore-quickstart-4.0-pre3/pipeline/install/jungle_bank/jungle.smallbank";
     /*this->ligoConfig = new NLLIGO::CLigoConfig();
     NLLIGO::CPrimitiveContext::instance().CurrentLigoConfig = this->ligoConfig;
     this->editLandscapePrimitive = new NLLIGO::CPrimitives();
@@ -59,6 +66,8 @@ LandscapeManager::~LandscapeManager()
 {
     //delete this->ligoConfig;
     //delete this->editLandscapePrimitive;
+    delete this->landscape;
+    delete this->tileBank;
 }
 
 bool LandscapeManager::Load(const std::string& path)
@@ -109,17 +118,17 @@ bool LandscapeManager::LoadZone(const std::string& path)
         return false;
     }
     
-    NL3D::CLandscape landscape;
+    //this->landscape->init();
     NLMISC::CAABBox bbox;
-    NL3D::CZone loadingZone;
+    NL3D::CZone loadingZone = NL3D::CZone();
     loadingZone.serial(zoneFile);
     zoneFile.close();
 
-    const auto zoneId(loadingZone.getZoneId());
-    landscape.setNoiseMode(false);
+    const uint16 zoneId(loadingZone.getZoneId());
+    this->landscape->setNoiseMode(false);
     // add neighbor zones to get the same border vertices
-    this->addNeighborZones(landscape, zoneId, zoneSearchDirectory);
-    auto zone = landscape.getZone(zoneId);
+    this->addNeighborZones(zoneId, zoneSearchDirectory);
+    NL3D::CZone* zone = this->landscape->getZone(zoneId);
     if (zone == nullptr)
     {
         nlerror("Can't find zone with id: %i", zoneId);
@@ -127,7 +136,7 @@ bool LandscapeManager::LoadZone(const std::string& path)
     }
     try
     {
-        this->loadTileBank(landscape, this->tileBankFilePath);
+        this->loadTileBank(this->tileBankFilePath);
     }
     catch (...)
     {
@@ -145,12 +154,8 @@ bool LandscapeManager::LoadZone(const std::string& path)
 
     for (sint patchIndex = 0; patchIndex < zone->getNumPatchs(); patchIndex++)
     {
-        this->buildFaces(landscape, zoneId, patchIndex);
+        this->buildFaces(zoneId, patchIndex);
     }
-
-    this->uploadTexture(this->tileIdMaps[0]);
-    this->uploadTexture(this->tileIdMaps[1]);
-    this->uploadTexture(this->tileIdMaps[2]);
 
     return true;
 }
@@ -270,11 +275,12 @@ bool LandscapeManager::LoadShaders(SDL_Window* window)
     
     landscapePipelineInfo.depth_stencil_state = SDL_GPUDepthStencilState();
     landscapePipelineInfo.depth_stencil_state.compare_op = SDL_GPU_COMPAREOP_LESS;
+    landscapePipelineInfo.depth_stencil_state.enable_depth_test = true;
     landscapePipelineInfo.depth_stencil_state.enable_depth_write = true;
-    landscapePipelineInfo.depth_stencil_state.enable_stencil_test = true;
     
     landscapePipelineInfo.target_info = SDL_GPUGraphicsPipelineTargetInfo();
 	SDL_GPUColorTargetDescription colorTargets[1];
+    colorTargets[0] = SDL_GPUColorTargetDescription();
     colorTargets[0].format = colorTargetFormat;
     landscapePipelineInfo.target_info.color_target_descriptions = colorTargets;
     landscapePipelineInfo.target_info.num_color_targets = 1;
@@ -300,12 +306,17 @@ bool LandscapeManager::LoadShaders(SDL_Window* window)
 
 bool LandscapeManager::PrepareRender()
 {
+    this->uploadTexture(this->tileIdMaps[0]);
+    this->uploadTexture(this->tileIdMaps[1]);
+    this->uploadTexture(this->tileIdMaps[2]);
+
     this->createBuffer(this->vertices.data(),
         this->vertices.size() * sizeof(VertexData),
         SDL_GPU_BUFFERUSAGE_VERTEX, this->vertexBuffer);
     this->createBuffer(this->indexes.data(),
         this->indexes.size() * sizeof(int),
         SDL_GPU_BUFFERUSAGE_INDEX, this->indexBuffer);
+    this->ready = true;
     
     return true;
 }
@@ -313,9 +324,12 @@ bool LandscapeManager::PrepareRender()
 bool LandscapeManager::Render(SDL_GPURenderPass* renderPass,
     SDL_GPUCommandBuffer* cmd, SDL_GPUSampler* sampler)
 {
-    SimpleInstance instance;
-    std::copy(std::begin(this->worldTransform), std::end(this->worldTransform), std::begin(instance.model));
-    SDL_PushGPUVertexUniformData(cmd, 1, &instance, sizeof(SimpleInstance));
+    if (!ready)
+    {
+        return true;
+    }
+
+    SDL_PushGPUVertexUniformData(cmd, 1, &this->worldTransform, sizeof(Mat4));
 
     if (this->landscapePipeline == nullptr)
     {
@@ -352,7 +366,8 @@ bool LandscapeManager::Render(SDL_GPURenderPass* renderPass,
     SDL_GPUBufferBinding indexBufferBinding;
     indexBufferBinding.buffer = this->indexBuffer;
     indexBufferBinding.offset = 0;
-    SDL_BindGPUIndexBuffer(renderPass, &indexBufferBinding, SDL_GPU_INDEXELEMENTSIZE_32BIT);
+    SDL_BindGPUIndexBuffer(renderPass, &indexBufferBinding,
+        SDL_GPU_INDEXELEMENTSIZE_32BIT);
     SDL_DrawGPUIndexedPrimitives(renderPass, this->indexes.size(), 1, 0, 0, 0);
 
     return true;
@@ -361,11 +376,10 @@ bool LandscapeManager::Render(SDL_GPURenderPass* renderPass,
 void LandscapeManager::parsePath(std::string& path)
 {
     path = path.substr(path.find(":") + 1);
-    path.erase(path.find_last_not_of(" \n\r\t\,\"") + 1);
+    path.erase(path.find_last_not_of(" \n\r\t,\"") + 1);
 }
 
-void LandscapeManager::addZone(NL3D::CLandscape& landscape,
-    const std::string& zoneSearchDirectory,
+void LandscapeManager::addZone(const std::string& zoneSearchDirectory,
     const sint x, const sint y)
 {
     std::string zoneFilename(zoneSearchDirectory);
@@ -378,7 +392,7 @@ void LandscapeManager::addZone(NL3D::CLandscape& landscape,
         nlinfo("Found Neighbor Zone: %s", zoneFilename.c_str());
         NL3D::CZone zone;
         zone.serial(zoneFile);
-        landscape.addZone(zone);
+        this->landscape->addZone(zone);
         zoneFile.close();
         return;
     }
@@ -391,7 +405,7 @@ void LandscapeManager::addZone(NL3D::CLandscape& landscape,
         nlinfo("Found Neighbor Zone: %s", zoneFilename.c_str());
         NL3D::CZone zone;
         zone.serial(zoneFile);
-        landscape.addZone(zone);
+        this->landscape->addZone(zone);
         zoneFile.close();
     }
 }
@@ -414,33 +428,40 @@ std::string LandscapeManager::zoneNameLowerCase(const sint x, const sint y)
     return name.str();
 }
 
-void LandscapeManager::addNeighborZones(NL3D::CLandscape& landscape, const uint16& zoneId,
+void LandscapeManager::addNeighborZones(const uint16& zoneId,
     const std::string& zoneSearchDirectory)
 {
     const sint x(zoneId & 255);
     const sint y(zoneId >> 8);
 
-    this->addZone(landscape, zoneSearchDirectory, x - 1, y - 1);
-    this->addZone(landscape, zoneSearchDirectory, x + 0, y - 1);
-    this->addZone(landscape, zoneSearchDirectory, x + 1, y - 1);
-    this->addZone(landscape, zoneSearchDirectory, x - 1, y + 0);
-    this->addZone(landscape, zoneSearchDirectory, x + 0, y + 0);
-    this->addZone(landscape, zoneSearchDirectory, x + 1, y + 0);
-    this->addZone(landscape, zoneSearchDirectory, x - 1, y + 1);
-    this->addZone(landscape, zoneSearchDirectory, x + 0, y + 1);
-    this->addZone(landscape, zoneSearchDirectory, x + 1, y + 1);
+    this->addZone(zoneSearchDirectory, x - 1, y - 1);
+    this->addZone(zoneSearchDirectory, x + 0, y - 1);
+    this->addZone(zoneSearchDirectory, x + 1, y - 1);
+    this->addZone(zoneSearchDirectory, x - 1, y + 0);
+    this->addZone(zoneSearchDirectory, x + 0, y + 0);
+    this->addZone(zoneSearchDirectory, x + 1, y + 0);
+    this->addZone(zoneSearchDirectory, x - 1, y + 1);
+    this->addZone(zoneSearchDirectory, x + 0, y + 1);
+    this->addZone(zoneSearchDirectory, x + 1, y + 1);
 }
 
-void LandscapeManager::loadTileBank(NL3D::CLandscape& landscape, const std::string& bankFilePath)
+void LandscapeManager::loadTileBank(const std::string& bankFilePath)
 {
     if (!bankFilePath.empty())
     {
         NLMISC::CIFile bankFile(bankFilePath);
-        auto &tileBank = landscape.TileBank;
-        tileBank.serial(bankFile);
-        nldebug("TileBank land count %i", tileBank.getLandCount());
-        nldebug("TileBank tileSet count %i", tileBank.getTileSetCount());
-        nldebug("TileBank tile count %i", tileBank.getTileCount());
+        NL3D::CLandscape* land = new NL3D::CLandscape();
+        land->init();
+        land->releaseAllTiles();
+        // Clear the bank
+        land->TileBank = NL3D::CTileBank();
+        
+        //this->tileBank->serial(bankFile);
+        //this->landscape->TileBank = *this->tileBank;
+        //this->landscape->initTileBanks();
+        //nldebug("TileBank land count %i", landscape->TileBank.getLandCount());
+        //nldebug("TileBank tileSet count %i", landscape->TileBank.getTileSetCount());
+        //nldebug("TileBank tile count %i", landscape->TileBank.getTileCount());
     }
 }
 
@@ -532,10 +553,10 @@ void LandscapeManager::createTileIdMap(Image& image, int width, int height)
         for (int x = 0; x < width; x++)
         {
             image.pixels[x * y] =
-                (static_cast<int>(NL_TILE_ELM_LAYER_EMPTY) << 48) |
-                (static_cast<int>(0) << 32) |
-                (static_cast<int>(0) << 16) |
-                static_cast<int>(NL_TILE_ELM_LAYER_EMPTY);
+                (static_cast<Uint64>(NL_TILE_ELM_LAYER_EMPTY) << 48) |
+                (static_cast<Uint64>(0) << 32) |
+                (static_cast<Uint64>(0) << 16) |
+                static_cast<Uint64>(NL_TILE_ELM_LAYER_EMPTY);
         }
     }
 }
@@ -560,19 +581,18 @@ void LandscapeManager::drawTileInfoMap(
                 rotAlpha = tileBank.getTile(tileId)->getRotAlpha();
             }
             image.pixels[x * y] =
-                (static_cast<int>(tileId) << 48) |
-                (static_cast<int>(orientation) << 32) |
-                (static_cast<int>(rotAlpha) << 16) |
-                static_cast<int>(NL_TILE_ELM_LAYER_EMPTY);
+                (static_cast<Uint64>(tileId) << 48) |
+                (static_cast<Uint64>(orientation) << 32) |
+                (static_cast<Uint64>(rotAlpha) << 16) |
+                static_cast<Uint64>(NL_TILE_ELM_LAYER_EMPTY);
         }
     }
 }
 
-void LandscapeManager::buildFaces(
-    NL3D::CLandscape& landscape, sint zoneId, sint patch)
+void LandscapeManager::buildFaces(sint zoneId, sint patch)
 {
     NLMISC::CUV A(0, 0), B(0, 1), C(1, 1), D(1, 0);
-    NL3D::CZone *pZone = landscape.getZone(zoneId);
+    NL3D::CZone *pZone = this->landscape->getZone(zoneId);
 
     // Then trace all patch.
     nlassert(patch >= 0);
@@ -727,7 +747,7 @@ void LandscapeManager::uploadTexture(Image* image)
     src.offset = 0;
 
     SDL_GPUTextureRegion dst;
-    dst.texture = image->texture.get();
+    dst.texture = image->texture;
     dst.layer = 0;
     dst.w = static_cast<Uint32>(image->width);
     dst.h = static_cast<Uint32>(image->height);

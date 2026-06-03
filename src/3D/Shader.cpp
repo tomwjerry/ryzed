@@ -28,7 +28,7 @@ void Shader::Load(
     SDL_GPUShaderFormat format = SDL_GPU_SHADERFORMAT_INVALID;
     const char* BasePath = SDL_GetBasePath();
     const char* entrypoint = "main";
-    SDL_snprintf(fullPath, sizeof(fullPath), "%sresources/Shaders/%s.hlsl",
+    SDL_snprintf(fullPath, sizeof(fullPath), "%s../../resources/Shaders/%s.hlsl",
         BasePath, shaderFilename);
 
     size_t codeSize;
@@ -41,13 +41,29 @@ void Shader::Load(
 
     size_t spirvSize;
     SDL_ShaderCross_HLSL_Info hlsl_info;
+    SDL_zero(hlsl_info);
     hlsl_info.source = (const char*)code;
-    hlsl_info.shader_stage = SDL_SHADERCROSS_SHADERSTAGE_VERTEX;
+    hlsl_info.shader_stage = stage;
     hlsl_info.entrypoint = "main";
+
+    if (!(SDL_ShaderCross_GetHLSLShaderFormats() & SDL_GPU_SHADERFORMAT_SPIRV))
+    {
+        SDL_Log("SDL_ShaderCross does not support HLSL -> SPIRV");
+        return;
+    }
+
     void* spirv = SDL_ShaderCross_CompileSPIRVFromHLSL(
         &hlsl_info,
         &spirvSize
     );
+
+    if (spirv == NULL)
+    {
+        const char* reason = SDL_GetError();
+        SDL_Log("Cannot make spirv for whatever reason!");
+        SDL_Log(reason);
+        return;
+    }
 
     SDL_ShaderCross_SPIRV_Info shaderInfo = {
         (const Uint8*)spirv,

@@ -11,7 +11,7 @@ struct VS_INPUT
 
 struct VS_OUTPUT
 {
-    float4 fPosition : SV_POSITION;
+    float4 oPosition : SV_POSITION;
     float3 fNormal : NORMAL;
     float2 fTexUV : TEXCOORD0;
     int3 fTileIndexes : TILEINDEXES;
@@ -20,10 +20,13 @@ struct VS_OUTPUT
     float2 ftile2_uv : TEXCOORD3;
 };
 
-cbuffer VPM : register(b0) 
+cbuffer CameraInfo : register(b0) 
 {
     float4x4 view;
     float4x4 proj;
+};
+cbuffer Model : register(b1)
+{
     float4x4 model;
 };
 
@@ -39,8 +42,8 @@ VS_OUTPUT main(VS_INPUT input)
     output.ftile1_uv = input.vtile1_uv;
     output.ftile2_uv = input.vtile2_uv;
 
-    output.oPosition = mul(proj, view);
-    output.oPosition = mul(output.oPosition, model);
-    output.oPosition = mul(output.oPosition, float4(input.vPosition, 1.0));
+    float4x4 vpm = mul(proj, view);
+    vpm = mul(vpm, model);
+    output.oPosition = mul(vpm, float4(input.vPosition, 1.0));
     return output;
 }

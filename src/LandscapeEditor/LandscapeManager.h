@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../Math.h"
 #include "../3D/Image.h"
 #include "../3D/Material.h"
 #include "../3D/IRenderable.h"
@@ -26,12 +27,6 @@ struct VertexData
     NLMISC::CUV tileUV2;
 };
 
-
-struct SimpleInstance
-{
-    float model[16];
-};
-
 class LandscapeManager : public IRenderable
 {
 private:
@@ -43,12 +38,15 @@ private:
 
     SDL_GPUDevice* device;
 
-    float worldTransform[16];
+    Mat4 worldTransform;
 
     std::string tileBankFilePath;
 
     std::vector<NL3D::CZone*> editZone;
+    NL3D::CTileBank* tileBank;
+    NL3D::CLandscape* landscape;
 
+    bool ready = false;
     std::vector<VertexData> vertices;
     std::vector<int> indexes;
     SDL_GPUBuffer* vertexBuffer;
@@ -58,13 +56,13 @@ private:
 
     void parsePath(std::string& path);
 
-    void addZone(NL3D::CLandscape& landscape, const std::string& zoneSearchDirectory,
+    void addZone(const std::string& zoneSearchDirectory,
         const sint x, const sint y);
     std::string zoneName(const sint x, const sint y);
     std::string zoneNameLowerCase(const sint x, const sint y);
-    void addNeighborZones(NL3D::CLandscape& landscape, const uint16& zoneId,
+    void addNeighborZones(const uint16& zoneId,
         const std::string& zoneSearchDirectory);
-    void loadTileBank(NL3D::CLandscape& landscape, const std::string& bankFilePath);
+    void loadTileBank(const std::string& bankFilePath);
 
     uint8 getPatchTileIndex(const NL3D::CPatch& patch, const uint8 s, const uint8 t);
     NLMISC::CUV tileOrientation(NLMISC::CUV in, uint8 orientation);
@@ -74,8 +72,7 @@ private:
     void createTileIdMap(Image& image, int width, int height);
     void drawTileInfoMap(const NL3D::CPatch& patch, Image& image, uint8 layer);
     
-    void buildFaces(
-        NL3D::CLandscape& landscape, sint zoneId, sint patchtileIdMaps);
+    void buildFaces(sint zoneId, sint patchIndex);
 
     void createBuffer(
         const void* data, size_t size,

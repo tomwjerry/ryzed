@@ -13,32 +13,34 @@ Texture2D tile1 : register(t1);
 Texture2D tile2 : register(t2);
 SamplerState tileSampler : register(s0);
 
-float4 main(PS_INPUT input) : COLOR
+static const uint EMPTY_TILE = 4095; // Matches NL_TILE_ELM_LAYER_EMPTY
+
+float4 main(PS_INPUT input) : SV_TARGET
 {
-    float3 uv0 = float3(input.tile0_uv, float(input.tileIndices.x));
-    float4 finalColor = tile0.Sample(tileSampler, uv0);
+    float3 uv0 = float3(input.ftile0_uv, float(input.fTileIndexes.x));
+    float4 finalColor = tile0.Sample(tileSampler, uv0.xy);
     
     // --- LAYER 1 ---
-    if (input.tileIndices.y != EMPTY_TILE) 
+    if (input.fTileIndexes.y != EMPTY_TILE) 
     {
-        float3 uv1 = float3(input.tile1_uv, float(input.tileIndices.y));
-        float4 color1 = tile1.Sample(tileSampler, uv1);
+        float3 uv1 = float3(input.ftile1_uv, float(input.fTileIndexes.y));
+        float4 color1 = tile1.Sample(tileSampler, uv1.xy);
         // lerp maps seamlessly to GLSL's 'mix' function
         finalColor = lerp(finalColor, color1, color1.a);
     }
     
     // --- LAYER 2 ---
-    if (input.tileIndices.z != EMPTY_TILE) 
+    if (input.fTileIndexes.z != EMPTY_TILE) 
     {
-        float3 uv2 = float3(input.tile2_uv, float(input.tileIndices.z));
-        float4 color2 = tile2.Sample(tileSampler, uv2);
+        float3 uv2 = float3(input.ftile2_uv, float(input.fTileIndexes.z));
+        float4 color2 = tile2.Sample(tileSampler, uv2.xy);
         finalColor = lerp(finalColor, color2, color2.a);
     }
     
     // --- LIGHTING ---
     // Simple global directional light direction
     float3 lightDir = normalize(float3(0.5f, 1.0f, 0.3f));
-    float ndotl = max(dot(normalize(input.normal), lightDir), 0.2f); // 0.2f ambient floor
+    float ndotl = max(dot(normalize(input.fNormal), lightDir), 0.2f); // 0.2f ambient floor
     
     return float4(finalColor.rgb * ndotl, 1.0f);
 }

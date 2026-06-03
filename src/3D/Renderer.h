@@ -11,10 +11,9 @@
  * Copyright (C) 2024 Caleb Cornett <caleb.cornett@outlook.com> (zlib Licence)
  */
 
-struct MVP {
+struct CameraInfo {
     Mat4 view;
     Mat4 proj;
-    Mat4 model;
 };
 
 class Renderer
@@ -22,7 +21,6 @@ class Renderer
 private:
     SDL_GPUDevice* device = nullptr;
     SDL_Window* window = nullptr;
-    SDL_GPUCommandBuffer* cmd = nullptr;
     SDL_GPUTexture* msaaTexture = nullptr;
     SDL_GPUTexture* depthTexture = nullptr;
     SDL_GPUTexture* resolveTexture = nullptr;
