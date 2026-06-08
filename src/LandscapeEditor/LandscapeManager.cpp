@@ -3,6 +3,7 @@
  */
 
 #include "LandscapeManager.h"
+#include "../3D/DummyDriver.h"
 #include "../3D/Shader.h"
 
 #include <filesystem>
@@ -27,8 +28,20 @@
 
 LandscapeManager::LandscapeManager(SDL_GPUDevice* device, const std::string& cfgFile)
 {
-    this->tileBank = new NL3D::CTileBank;
-    this->landscape = new NL3D::CLandscape;
+    this->tileBank = new NL3D::CTileBank();
+    // Create a Landscape.
+    DummyDriver* driver = new DummyDriver();
+    /*NL3D::CNELU::Driver = driver;
+    NL3D::CViewport viewport;
+    NL3D::CNELU::initScene(viewport);
+    NL3D::CNELU::Scene->setDriver(driver);
+    this->landscapeModel =
+        (NL3D::CLandscapeModel*)NL3D::CNELU::Scene->createModel(NL3D::LandscapeModelId);*/
+    this->landscape = new NL3D::CLandscape();
+    
+    this->tileIdMaps[0] = new Image();
+    this->tileIdMaps[1] = new Image();
+    this->tileIdMaps[2] = new Image();
 
     this->device = device;
 
@@ -36,14 +49,17 @@ LandscapeManager::LandscapeManager(SDL_GPUDevice* device, const std::string& cfg
     this->worldTransform.m1 = 0.0f;
     this->worldTransform.m2 = 0.0f;
     this->worldTransform.m3 = 0.0f;
-    this->worldTransform.m4 = 1.0f;
-    this->worldTransform.m5 = 0.0f;
+
+    this->worldTransform.m4 = 0.0f;
+    this->worldTransform.m5 = 1.0f;
     this->worldTransform.m6 = 0.0f;
     this->worldTransform.m7 = 0.0f;
-    this->worldTransform.m8 = 1.0f;
+
+    this->worldTransform.m8 = 0.0f;
     this->worldTransform.m9 = 0.0f;
-    this->worldTransform.m10 = 0.0f;
+    this->worldTransform.m10 = 1.0f;
     this->worldTransform.m11 = 0.0f;
+
     this->worldTransform.m12 = 0.0f;
     this->worldTransform.m13 = 0.0f;
     this->worldTransform.m14 = 0.0f;
@@ -64,10 +80,14 @@ LandscapeManager::LandscapeManager(SDL_GPUDevice* device, const std::string& cfg
 
 LandscapeManager::~LandscapeManager()
 {
-    //delete this->ligoConfig;
-    //delete this->editLandscapePrimitive;
-    delete this->landscape;
+    this->tileIdMaps[0]->Release(this->device);
+    this->tileIdMaps[1]->Release(this->device);
+    this->tileIdMaps[2]->Release(this->device);
+
     delete this->tileBank;
+    delete this->tileIdMaps[0];
+    delete this->tileIdMaps[1];
+    delete this->tileIdMaps[2];
 }
 
 bool LandscapeManager::Load(const std::string& path)
@@ -118,22 +138,15 @@ bool LandscapeManager::LoadZone(const std::string& path)
         return false;
     }
     
-    //this->landscape->init();
     NLMISC::CAABBox bbox;
     NL3D::CZone loadingZone = NL3D::CZone();
     loadingZone.serial(zoneFile);
     zoneFile.close();
 
     const uint16 zoneId(loadingZone.getZoneId());
-    this->landscape->setNoiseMode(false);
+    this->landscape->addZone(loadingZone);
     // add neighbor zones to get the same border vertices
     this->addNeighborZones(zoneId, zoneSearchDirectory);
-    NL3D::CZone* zone = this->landscape->getZone(zoneId);
-    if (zone == nullptr)
-    {
-        nlerror("Can't find zone with id: %i", zoneId);
-        return false;
-    }
     try
     {
         this->loadTileBank(this->tileBankFilePath);
@@ -152,7 +165,7 @@ bool LandscapeManager::LoadZone(const std::string& path)
     this->createTileIdMap(*this->tileIdMaps[1], TILE_ID_MAP_SIZE, TILE_ID_MAP_SIZE);
     this->createTileIdMap(*this->tileIdMaps[2], TILE_ID_MAP_SIZE, TILE_ID_MAP_SIZE);
 
-    for (sint patchIndex = 0; patchIndex < zone->getNumPatchs(); patchIndex++)
+    for (sint patchIndex = 0; patchIndex < loadingZone.getNumPatchs(); patchIndex++)
     {
         this->buildFaces(zoneId, patchIndex);
     }
@@ -178,7 +191,7 @@ bool LandscapeManager::LoadShaders(SDL_Window* window)
         msaaSampleCount = SDL_GPU_SAMPLECOUNT_4;
     }
 
-    SDL_GPUVertexBufferDescription landscapeVBD[2] = {
+    SDL_GPUVertexBufferDescription landscapeVBD[1] = {
         {
             0,
             sizeof(VertexData),
@@ -187,7 +200,7 @@ bool LandscapeManager::LoadShaders(SDL_Window* window)
         }
     };
 
-    SDL_GPUVertexAttribute landscapeVA[9] = {
+    SDL_GPUVertexAttribute landscapeVA[7] = {
         // Position
         {
             0, // location
@@ -213,55 +226,41 @@ bool LandscapeManager::LoadShaders(SDL_Window* window)
         {
             3,
             0,
-            SDL_GPU_VERTEXELEMENTFORMAT_INT,
+            SDL_GPU_VERTEXELEMENTFORMAT_INT3,
             sizeof(float) * 8
-        },
-        // Tile Index 1
-        {
-            4,
-            0,
-            SDL_GPU_VERTEXELEMENTFORMAT_INT,
-            sizeof(float) * 8 + sizeof(uint32)
-        },
-        // Tile Index 2
-        {
-            5,
-            0,
-            SDL_GPU_VERTEXELEMENTFORMAT_INT,
-            sizeof(float) * 8 + sizeof(uint32) * 2
         },
         // 4: Tile 0 UV
         {
-            6,
+            4,
             0,
             SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2,
             sizeof(float) * 8 + sizeof(uint32) * 3
         },
         // 5: Tile 1 UV
         {
-            7,
+            5,
             0,
             SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2,
             sizeof(float) * 10 + sizeof(uint32) * 3
         },
         // 6: Tile 2 UV
         {
-            8,
+            6,
             0,
             SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2,
             sizeof(float) * 12 + sizeof(uint32) * 3
         }
     };
 
-    SDL_GPUGraphicsPipelineCreateInfo landscapePipelineInfo;
+    SDL_GPUGraphicsPipelineCreateInfo landscapePipelineInfo = SDL_GPUGraphicsPipelineCreateInfo();
     landscapePipelineInfo.vertex_shader = landscapeVert->GetShader();
     landscapePipelineInfo.fragment_shader = landscapeFrag->GetShader();
 
     landscapePipelineInfo.vertex_input_state = SDL_GPUVertexInputState();
     landscapePipelineInfo.vertex_input_state.vertex_buffer_descriptions = landscapeVBD;
-    landscapePipelineInfo.vertex_input_state.num_vertex_buffers = 2;
+    landscapePipelineInfo.vertex_input_state.num_vertex_buffers = 1;
     landscapePipelineInfo.vertex_input_state.vertex_attributes = landscapeVA;
-    landscapePipelineInfo.vertex_input_state.num_vertex_attributes = 2;
+    landscapePipelineInfo.vertex_input_state.num_vertex_attributes = 7;
 
     landscapePipelineInfo.primitive_type = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST;
     
@@ -306,9 +305,33 @@ bool LandscapeManager::LoadShaders(SDL_Window* window)
 
 bool LandscapeManager::PrepareRender()
 {
-    this->uploadTexture(this->tileIdMaps[0]);
-    this->uploadTexture(this->tileIdMaps[1]);
-    this->uploadTexture(this->tileIdMaps[2]);
+    SDL_GPUTransferBufferCreateInfo transferInfo;
+    transferInfo.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
+    transferInfo.size = 256 * 256 * 4 * 3;
+    SDL_GPUTransferBuffer* transferBuffer =
+        SDL_CreateGPUTransferBuffer(this->device, &transferInfo);
+
+    Uint32 texTransferOffset = 0;
+    this->tileIdMaps[0]->Stage(this->device, transferBuffer, 0);
+    texTransferOffset = this->tileIdMaps[0]->total_byte_count();
+    this->tileIdMaps[1]->Stage(this->device, transferBuffer, texTransferOffset);
+    texTransferOffset += this->tileIdMaps[1]->total_byte_count();
+    this->tileIdMaps[2]->Stage(this->device, transferBuffer, texTransferOffset);
+
+    SDL_GPUCommandBuffer* cmd = SDL_AcquireGPUCommandBuffer(this->device);
+    SDL_GPUCopyPass* copyPass = SDL_BeginGPUCopyPass(cmd);
+
+    texTransferOffset = 0;
+    this->tileIdMaps[0]->Upload(this->device, copyPass, transferBuffer, 0);
+    texTransferOffset = this->tileIdMaps[0]->total_byte_count();
+    this->tileIdMaps[1]->Upload(this->device, copyPass, transferBuffer, 0);
+    texTransferOffset = this->tileIdMaps[1]->total_byte_count();
+    this->tileIdMaps[2]->Upload(this->device, copyPass, transferBuffer, 0);
+
+    SDL_EndGPUCopyPass(copyPass);
+    SDL_SubmitGPUCommandBuffer(cmd);
+
+    SDL_ReleaseGPUTransferBuffer(this->device, transferBuffer);
 
     this->createBuffer(this->vertices.data(),
         this->vertices.size() * sizeof(VertexData),
@@ -316,15 +339,30 @@ bool LandscapeManager::PrepareRender()
     this->createBuffer(this->indexes.data(),
         this->indexes.size() * sizeof(int),
         SDL_GPU_BUFFERUSAGE_INDEX, this->indexBuffer);
+
+    SDL_GPUSamplerCreateInfo samplerCreateInfo = SDL_GPUSamplerCreateInfo();
+    samplerCreateInfo.min_filter = SDL_GPU_FILTER_LINEAR;
+    samplerCreateInfo.mag_filter = SDL_GPU_FILTER_LINEAR;
+    samplerCreateInfo.mipmap_mode = SDL_GPU_SAMPLERMIPMAPMODE_LINEAR;
+    samplerCreateInfo.address_mode_u = SDL_GPU_SAMPLERADDRESSMODE_MIRRORED_REPEAT;
+    samplerCreateInfo.address_mode_v = SDL_GPU_SAMPLERADDRESSMODE_MIRRORED_REPEAT;
+    samplerCreateInfo.max_anisotropy = 4;
+    samplerCreateInfo.min_lod = 0.0f;
+    samplerCreateInfo.max_lod = 200.0f;
+    samplerCreateInfo.enable_anisotropy = true;
+    this->samplers[0] = SDL_CreateGPUSampler(this->device, &samplerCreateInfo);
+    this->samplers[1] = SDL_CreateGPUSampler(this->device, &samplerCreateInfo);
+    this->samplers[2] = SDL_CreateGPUSampler(this->device, &samplerCreateInfo);
+
     this->ready = true;
     
     return true;
 }
 
 bool LandscapeManager::Render(SDL_GPURenderPass* renderPass,
-    SDL_GPUCommandBuffer* cmd, SDL_GPUSampler* sampler)
+    SDL_GPUCommandBuffer* cmd)
 {
-    if (!ready)
+    if (!this->ready)
     {
         return true;
     }
@@ -349,21 +387,25 @@ bool LandscapeManager::Render(SDL_GPURenderPass* renderPass,
 
     SDL_BindGPUGraphicsPipeline(renderPass, this->landscapePipeline);
     SDL_GPUBufferBinding vertexBufferBindings[1];
+    vertexBufferBindings[0] = SDL_GPUBufferBinding();
     vertexBufferBindings[0].buffer = this->vertexBuffer;
     vertexBufferBindings[0].offset = 0;
 
     SDL_BindGPUVertexBuffers(renderPass, 0, vertexBufferBindings, 1); // Vertex buffer size!
     
     SDL_GPUTextureSamplerBinding textureSamplerBindings[3];
+    textureSamplerBindings[0] = SDL_GPUTextureSamplerBinding();
     textureSamplerBindings[0].texture = this->tileIdMaps[0]->texture;
-    textureSamplerBindings[0].sampler = sampler;
+    textureSamplerBindings[0].sampler = this->samplers[0];
+    textureSamplerBindings[1] = SDL_GPUTextureSamplerBinding();
     textureSamplerBindings[1].texture = this->tileIdMaps[1]->texture;
-    textureSamplerBindings[1].sampler = sampler;
+    textureSamplerBindings[1].sampler = this->samplers[1];
+    textureSamplerBindings[2] = SDL_GPUTextureSamplerBinding();
     textureSamplerBindings[2].texture = this->tileIdMaps[2]->texture;
-    textureSamplerBindings[2].sampler = sampler;
+    textureSamplerBindings[2].sampler = this->samplers[2];
     SDL_BindGPUFragmentSamplers(renderPass, 0, textureSamplerBindings, 3);
 
-    SDL_GPUBufferBinding indexBufferBinding;
+    SDL_GPUBufferBinding indexBufferBinding = SDL_GPUBufferBinding();
     indexBufferBinding.buffer = this->indexBuffer;
     indexBufferBinding.offset = 0;
     SDL_BindGPUIndexBuffer(renderPass, &indexBufferBinding,
@@ -392,6 +434,7 @@ void LandscapeManager::addZone(const std::string& zoneSearchDirectory,
         nlinfo("Found Neighbor Zone: %s", zoneFilename.c_str());
         NL3D::CZone zone;
         zone.serial(zoneFile);
+        //this->landscapeModel->Landscape.addZone(zone);
         this->landscape->addZone(zone);
         zoneFile.close();
         return;
@@ -405,6 +448,7 @@ void LandscapeManager::addZone(const std::string& zoneSearchDirectory,
         nlinfo("Found Neighbor Zone: %s", zoneFilename.c_str());
         NL3D::CZone zone;
         zone.serial(zoneFile);
+        //this->landscapeModel->Landscape.addZone(zone);
         this->landscape->addZone(zone);
         zoneFile.close();
     }
@@ -450,18 +494,10 @@ void LandscapeManager::loadTileBank(const std::string& bankFilePath)
     if (!bankFilePath.empty())
     {
         NLMISC::CIFile bankFile(bankFilePath);
-        NL3D::CLandscape* land = new NL3D::CLandscape();
-        land->init();
-        land->releaseAllTiles();
-        // Clear the bank
-        land->TileBank = NL3D::CTileBank();
-        
-        //this->tileBank->serial(bankFile);
-        //this->landscape->TileBank = *this->tileBank;
-        //this->landscape->initTileBanks();
-        //nldebug("TileBank land count %i", landscape->TileBank.getLandCount());
-        //nldebug("TileBank tileSet count %i", landscape->TileBank.getTileSetCount());
-        //nldebug("TileBank tile count %i", landscape->TileBank.getTileCount());
+        this->tileBank->serial(bankFile);
+        nldebug("TileBank land count %i", this->tileBank->getLandCount());
+        nldebug("TileBank tileSet count %i", this->tileBank->getTileSetCount());
+        nldebug("TileBank tile count %i", this->tileBank->getTileCount());
     }
 }
 
@@ -592,7 +628,7 @@ void LandscapeManager::drawTileInfoMap(
 void LandscapeManager::buildFaces(sint zoneId, sint patch)
 {
     NLMISC::CUV A(0, 0), B(0, 1), C(1, 1), D(1, 0);
-    NL3D::CZone *pZone = this->landscape->getZone(zoneId);
+    NL3D::CZone *pZone = this->landscape->getZone(zoneId); //this->landscapeModel->Landscape.getZone(zoneId);
 
     // Then trace all patch.
     nlassert(patch >= 0);
@@ -642,6 +678,14 @@ void LandscapeManager::buildFaces(sint zoneId, sint patch)
             uint8 uvOff;
             tile.getTile256Info(is256, uvOff);
         
+            uint32_t vertexOffset = this->vertices.size();
+            this->indexes.push_back(vertexOffset + 0);
+            this->indexes.push_back(vertexOffset + 1);
+            this->indexes.push_back(vertexOffset + 2);
+            this->indexes.push_back(vertexOffset + 0);
+            this->indexes.push_back(vertexOffset + 2);
+            this->indexes.push_back(vertexOffset + 3);
+
             VertexData vd = VertexData();
             vd.position = NL3D::CVector(pa->computeContinousVertex(x * OOS, y * OOT));
             vd.normal = NL3D::CVector(bezierPatch.evalNormal(x * OOS, y * OOT));
@@ -677,20 +721,13 @@ void LandscapeManager::buildFaces(sint zoneId, sint patch)
             vd.tileUV1 = this->tileUV(D, tile.getTileOrient(1), is256, uvOff);
             vd.tileUV2 = this->tileUV(D, tile.getTileOrient(2), is256, uvOff);
             this->vertices.push_back(vd);
-
-            this->indexes.push_back(0);
-            this->indexes.push_back(1);
-            this->indexes.push_back(2);
-            this->indexes.push_back(0);
-            this->indexes.push_back(2);
-            this->indexes.push_back(3);
         }
     }
 }
 
 void LandscapeManager::createBuffer(
     const void* data, size_t size,
-    SDL_GPUBufferUsageFlags usage, SDL_GPUBuffer* buffer)
+    SDL_GPUBufferUsageFlags usage, SDL_GPUBuffer*& buffer)
 {
     SDL_GPUBufferCreateInfo bufferCreateInfo = SDL_GPUBufferCreateInfo();
     bufferCreateInfo.usage = usage;
@@ -725,38 +762,4 @@ void LandscapeManager::createBuffer(
     SDL_SubmitGPUCommandBuffer(cmd);
 
     SDL_ReleaseGPUTransferBuffer(device, transferBuffer);
-}
-
-void LandscapeManager::uploadTexture(Image* image)
-{
-    SDL_GPUTransferBufferCreateInfo transferInfo;
-    transferInfo.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
-    transferInfo.size = static_cast<Uint32>(image->pixels.size());
-    SDL_GPUTransferBuffer* transferBuffer =
-        SDL_CreateGPUTransferBuffer(this->device, &transferInfo);
-
-    void* transferData = SDL_MapGPUTransferBuffer(this->device, transferBuffer, false);
-    memcpy(transferData, image->pixels.data(), image->pixels.size());
-    SDL_UnmapGPUTransferBuffer(this->device, transferBuffer);
-
-    SDL_GPUCommandBuffer* cmd = SDL_AcquireGPUCommandBuffer(this->device);
-    SDL_GPUCopyPass* copyPass = SDL_BeginGPUCopyPass(cmd);
-
-    SDL_GPUTextureTransferInfo src;
-    src.transfer_buffer = transferBuffer;
-    src.offset = 0;
-
-    SDL_GPUTextureRegion dst;
-    dst.texture = image->texture;
-    dst.layer = 0;
-    dst.w = static_cast<Uint32>(image->width);
-    dst.h = static_cast<Uint32>(image->height);
-    dst.d = 1;
-    SDL_UploadToGPUTexture(copyPass, &src, &dst, false);
-
-    SDL_EndGPUCopyPass(copyPass);
-    image->GenerateMipmaps(cmd);
-    SDL_SubmitGPUCommandBuffer(cmd);
-
-    SDL_ReleaseGPUTransferBuffer(this->device, transferBuffer);
 }

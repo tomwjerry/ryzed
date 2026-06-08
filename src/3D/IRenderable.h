@@ -8,5 +8,5 @@ public:
     virtual ~IRenderable() {}
     virtual bool LoadShaders(SDL_Window* window) = 0;
     virtual bool PrepareRender() = 0;
-    virtual bool Render(SDL_GPURenderPass* renderPass, SDL_GPUCommandBuffer* cmd, SDL_GPUSampler* sampler) = 0;
+    virtual bool Render(SDL_GPURenderPass* renderPass, SDL_GPUCommandBuffer* cmd) = 0;
 };

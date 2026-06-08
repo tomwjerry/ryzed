@@ -56,18 +56,6 @@ void Renderer::Init()
     resolveTextureCreateInfo.layer_count_or_depth = 1;
     resolveTextureCreateInfo.num_levels = 1;
     this->resolveTexture = SDL_CreateGPUTexture(device, &resolveTextureCreateInfo);
-
-    SDL_GPUSamplerCreateInfo samplerCreateInfo = SDL_GPUSamplerCreateInfo();
-    samplerCreateInfo.min_filter = SDL_GPU_FILTER_LINEAR;
-    samplerCreateInfo.mag_filter = SDL_GPU_FILTER_LINEAR;
-    samplerCreateInfo.mipmap_mode = SDL_GPU_SAMPLERMIPMAPMODE_LINEAR;
-    samplerCreateInfo.address_mode_u = SDL_GPU_SAMPLERADDRESSMODE_MIRRORED_REPEAT;
-    samplerCreateInfo.address_mode_v = SDL_GPU_SAMPLERADDRESSMODE_MIRRORED_REPEAT;
-    samplerCreateInfo.max_anisotropy = 4;
-    samplerCreateInfo.min_lod = 0.0f;
-    samplerCreateInfo.max_lod = 200.0f;
-    samplerCreateInfo.enable_anisotropy = true;
-    this->sampler = SDL_CreateGPUSampler(device, &samplerCreateInfo);
 }
 
 void Renderer::AddRenderable(IRenderable* renderable)
@@ -75,49 +63,18 @@ void Renderer::AddRenderable(IRenderable* renderable)
     this->renderables.push_back(renderable);
 }
 
-void Renderer::Render()
+void Renderer::Render(SDL_GPUCommandBuffer* cmd, SDL_GPURenderPass* renderPass)
 {
-    SDL_GPUCommandBuffer* cmd = SDL_AcquireGPUCommandBuffer(this->device);
+    CameraInfo camInfo;
+    camInfo.view = this->camera->GetViewMatrix();
+    camInfo.proj = this->camera->GetProjMatrix();
+    Vector3 cameraPos = this->camera->GetEye();
 
-    SDL_GPUTexture* swapchainTexture;
-    if (!SDL_WaitAndAcquireGPUSwapchainTexture(cmd, this->window, &swapchainTexture, NULL, NULL))
+    SDL_PushGPUVertexUniformData(cmd, 0, &camInfo, sizeof(CameraInfo));
+    //SDL_PushGPUFragmentUniformData(cmd, 0, &cameraPos, sizeof(float[3])); // For lightning
+
+    for (const auto renderable : this->renderables)
     {
-        SDL_Log("WaitAndAcquireGPUSwapchainTexture1 failed: %s", SDL_GetError());
-        return;
-    }
-    if (swapchainTexture != NULL)
-    {
-        SDL_GPUColorTargetInfo colorTargetInfo = { 0 };
-        colorTargetInfo.texture = this->msaaTexture;
-        colorTargetInfo.clear_color = SDL_FColor{ 0.0f, 0.5f, 1.0f, 1.0f };
-        colorTargetInfo.load_op = SDL_GPU_LOADOP_CLEAR;
-        colorTargetInfo.store_op = SDL_GPU_STOREOP_RESOLVE;
-        colorTargetInfo.resolve_texture = this->resolveTexture;
-
-        SDL_GPUDepthStencilTargetInfo depthTargetInfo = { 0 };
-        depthTargetInfo.texture = this->depthTexture;
-        depthTargetInfo.clear_depth = 1.0f;
-        depthTargetInfo.load_op = SDL_GPU_LOADOP_CLEAR;
-        depthTargetInfo.store_op = SDL_GPU_STOREOP_STORE;
-
-        SDL_GPURenderPass* renderPass = SDL_BeginGPURenderPass(
-            cmd, &colorTargetInfo, 1, &depthTargetInfo);
-
-        CameraInfo camInfo;
-        camInfo.view = this->camera->GetViewMatrix();
-        camInfo.proj = this->camera->GetProjMatrix();
-        Vector3 cameraPos = this->camera->GetEye();
-
-        SDL_PushGPUVertexUniformData(cmd, 0, &camInfo, sizeof(CameraInfo));
-        //SDL_PushGPUFragmentUniformData(cmd, 0, &cameraPos, sizeof(float[3])); // For lightning
-
-        for (const auto renderable : this->renderables)
-        {
-            renderable->Render(renderPass, cmd, sampler);
-        }
-        
-        SDL_EndGPURenderPass(renderPass);
-
-        SDL_SubmitGPUCommandBuffer(cmd);
+        renderable->Render(renderPass, cmd);
     }
 }

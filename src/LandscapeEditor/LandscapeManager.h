@@ -5,11 +5,13 @@
 #include "../3D/Material.h"
 #include "../3D/IRenderable.h"
 
+#include "nel/3d/landscape_model.h"
 #include "nel/3d/landscape.h"
 #include "nel/3d/zone.h"
 
 #include <SDL3/SDL.h>
 
+#include <map>
 #include <vector>
 
 /** 
@@ -42,8 +44,8 @@ private:
 
     std::string tileBankFilePath;
 
-    std::vector<NL3D::CZone*> editZone;
     NL3D::CTileBank* tileBank;
+    //NL3D::CLandscapeModel* landscapeModel;
     NL3D::CLandscape* landscape;
 
     bool ready = false;
@@ -52,6 +54,7 @@ private:
     SDL_GPUBuffer* vertexBuffer;
     SDL_GPUBuffer* indexBuffer;
     Image* tileIdMaps[3];
+    SDL_GPUSampler* samplers[3];
     SDL_GPUGraphicsPipeline* landscapePipeline;
 
     void parsePath(std::string& path);
@@ -76,8 +79,7 @@ private:
 
     void createBuffer(
         const void* data, size_t size,
-        SDL_GPUBufferUsageFlags usage, SDL_GPUBuffer* buffer);
-    void uploadTexture(Image* image);
+        SDL_GPUBufferUsageFlags usage, SDL_GPUBuffer*& buffer);
 
 public:
     LandscapeManager(SDL_GPUDevice* device, const std::string& cfgFile);
@@ -91,5 +93,5 @@ public:
     virtual bool LoadShaders(SDL_Window* window);
     virtual bool PrepareRender();
     virtual bool Render(SDL_GPURenderPass* renderPass,
-        SDL_GPUCommandBuffer* cmd, SDL_GPUSampler* sampler);
+        SDL_GPUCommandBuffer* cmd);
 };

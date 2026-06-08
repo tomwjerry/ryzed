@@ -1,0 +1,2001 @@
+#pragma once
+#include "nel/3d/driver.h"
+
+class DummyDriver : public NL3D::IDriver
+{
+    static const uint32						InterfaceVersion = 1;
+
+    virtual bool			init(uintptr_t windowIcon = 0, NL3D::emptyProc exitFunc = 0)
+    {
+        return true;
+    };
+
+    /// Deriver should calls IDriver::release() first, to destroy all driver components (textures, shaders, VBuffers).
+    virtual bool			release()
+    {
+        return true;
+    };
+
+    /// Before rendering via a driver in a thread, must activate() (per thread).
+    virtual bool			activate()
+    {
+        return true;
+    };
+
+    // Test if the device is lost. Can only happen with D3D.
+    // The calling application may skip some part of its rendering when it is the case (this is not a requirement, but may save cpu for other applications)
+    virtual	bool			isLost() const
+    {
+        return false;
+    };
+
+    /// Return true if driver is still active. Return false else. If he user close the window, must return false.
+    virtual bool			isActive()
+    {
+        return true;
+    };
+
+
+    // get the number of call to swapBuffer since the driver was created
+    virtual uint64			getSwapBufferCounter() const
+    {
+        return 0;
+    };
+
+
+
+    /// \name Disable Hardware Feature
+    /**	Disable some Feature that may be supported by the Hardware
+     *	Call before setDisplay() to work properly
+     */
+     // @{
+    virtual void			disableHardwareVertexProgram()
+    {
+    };
+    virtual void			disableHardwarePixelProgram()
+    {
+    };
+    virtual void			disableHardwareVertexArrayAGP()
+    {
+    };
+    virtual void			disableHardwareTextureShader()
+    {
+    };
+    // @}
+
+
+
+    /// \name Windowing
+    // @{
+    // first param is the associated window.
+    // Must be a HWND for Windows (WIN32).
+    virtual bool			setDisplay(nlWindow wnd, const NL3D::GfxMode& mode, bool show = true, bool resizeable = true)
+    {
+        return true;
+    };
+    // Must be called after a setDisplay that initialize the mode
+    virtual bool			setMode(const NL3D::GfxMode& mode)
+    {
+        return true;
+    };
+    virtual bool			getModes(std::vector<NL3D::GfxMode>& modes)
+    {
+        return true;
+    };
+
+    /// Set the title of the NeL window
+    virtual void			setWindowTitle(const ucstring& title)
+    {
+
+    };
+    /// Set icon(s) of the NeL window
+    virtual void			setWindowIcon(const std::vector<NLMISC::CBitmap>& bitmaps)
+    {
+        
+    };
+    /// Set the position of the NeL window
+    virtual void			setWindowPos(sint32 x, sint32 y)
+    {
+        
+    };
+    /// Show or hide the NeL window
+    virtual void			showWindow(bool show)
+    {
+        
+    };
+
+    /// return the current screen mode (if we are in windowed, return the screen mode behind the window)
+    virtual bool			getCurrentScreenMode(NL3D::GfxMode& mode)
+    {
+        return true;
+    };
+
+    /// enter/leave the dialog mode
+    virtual void			beginDialogMode()
+    {
+        
+    };
+    virtual void			endDialogMode()
+    {
+        
+    };
+
+    // Return is the associated window information. (Implementation dependent)
+    // Must be a HWND for Windows (WIN32).
+    virtual nlWindow		getDisplay()
+    {
+        return 0;
+    };
+
+    /// Return true if the driver supports monitor color properties (gamma, contrast, luminosity)
+    virtual bool			supportMonitorColorProperties() const
+    {
+        return true;
+    };
+
+    /// Setup monitor color properties. Return false if setup failed
+    virtual bool			setMonitorColorProperties(const NL3D::CMonitorColorProperties& properties)
+    {
+        return true;
+    };
+
+    // Return is the associated default window proc for the driver. (Implementation dependent)
+    // Must be a void GlWndProc(IDriver *driver, HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) for Windows (WIN32).
+    virtual NL3D::emptyProc		getWindowProc()
+    {
+        return 0;
+    };
+
+    virtual NLMISC::IEventEmitter* getEventEmitter()
+    {
+        return nullptr;
+    };
+
+
+
+    /// Copy a string to system clipboard.
+    virtual bool			copyTextToClipboard(const std::string& text)
+    {
+        return true;
+    };
+
+    /// Paste a string from system clipboard.
+    virtual bool			pasteTextFromClipboard(std::string& text)
+    {
+        return true;
+    };
+
+    virtual uint8			getBitPerPixel()
+    {
+        return 24;
+    };
+
+    /** Output a system message box and print a message with an icon. This method can be call even if the driver is not initialized.
+      * This method is used to return internal driver problem when string can't be displayed in the driver window.
+      * If the driver can't open a messageBox, it should not override this method and let the IDriver class manage it with the ASCII console.
+      *
+      * \param message This is the message to display in the message box.
+      * \param title This is the title of the message box.
+      * \param type This is the type of the message box, ie number of button and label of buttons.
+      * \param icon This is the icon of the message box should use like warning, error etc...
+      */
+    virtual TMessageBoxId	systemMessageBox(const char* message, const char* title, TMessageBoxType type = okType,
+        TMessageBoxIcon icon = noIcon)
+    {
+        return TMessageBoxId();
+    };
+
+    /// Get the width and the height of the window
+    virtual void			getWindowSize(uint32& width, uint32& height)
+    {
+        width = 0;
+        height = 0;
+    };
+
+    /// Get the position of the window always (0,0) in fullscreen
+    virtual void			getWindowPos(sint32& x, sint32& y)
+    {
+        x = 0;
+        y = 0;
+    };
+    // @}
+
+
+
+    /// \name Framebuffer operations
+    // @{
+    /// Clear the current target surface pixels. The function ignores the viewport settings but uses the scissor.
+    virtual bool			clear2D(NL3D::CRGBA rgba)
+    {
+        return true;
+    };
+
+    /// Clear the current target surface zbuffer. The function ignores the viewport settings but uses the scissor.
+    virtual bool			clearZBuffer(float zval = 1)
+    {
+        return true;
+    };
+
+    /// Clear the current target surface stencil buffer. The function ignores the viewport settings but uses the scissor.
+    virtual bool			clearStencilBuffer(sint stencilval = 0)
+    {
+        return true;
+    };
+
+    /// Set the color mask filter through where the operation done will pass
+    virtual void			setColorMask(bool bRed, bool bGreen, bool bBlue, bool bAlpha)
+    {
+        
+    };
+    // @}
+
+
+
+    /// \name Copy framebuffer to memory
+    // @{
+    /** get the RGBA back buffer. After swapBuffers(), the content of the back buffer is undefined.
+      *
+      * \param bitmap the buffer will be written in this bitmap
+      */
+    virtual void			getBuffer(NL3D::CBitmap& bitmap)
+    {
+        
+    };
+
+    /** get the ZBuffer (back buffer).
+      *
+      * \param zbuffer the returned array of Z. size of getWindowSize() .
+      */
+    virtual void			getZBuffer(std::vector<float>& zbuffer)
+    {
+        
+    };
+
+    /** get a part of the RGBA back buffer. After swapBuffers(), the content of the back buffer is undefined.
+      * NB: 0,0 is the bottom left corner of the screen.
+      *
+      * \param bitmap the buffer will be written in this bitmap
+      * \param rect the in/out (wanted/clipped) part of Color buffer to retrieve.
+      */
+    virtual void			getBufferPart(NL3D::CBitmap& bitmap, NLMISC::CRect& rect)
+    {
+        
+    };
+
+    /** get a part of the ZBuffer (back buffer).
+      * NB: 0,0 is the bottom left corner of the screen.
+      *
+      * \param zbuffer the returned array of Z. size of rec.Width*rec.Height.
+      * \param rect the in/out (wanted/clipped) part of ZBuffer to retrieve.
+      */
+    virtual void			getZBufferPart(std::vector<float>& zbuffer, NLMISC::CRect& rect)
+    {
+        
+    };
+    // @}
+
+
+
+    /// \name Copy memory to framebuffer
+    // @{
+    /** fill the RGBA back buffer
+      *
+      * \param bitmap will be written in the buffer. no-op if bad size.
+      *	\return true if success
+      */
+    virtual bool			fillBuffer(NL3D::CBitmap& bitmap)
+    {
+        return true;
+    };
+    // @}
+
+
+
+    /// \name Viewport depth clipping
+    // @{
+    /** Set depth range. Depth range specify a linear mapping from device z coordinates (in the [-1, 1] range) to window coordinates (in the [0, 1] range)
+      * This mapping occurs after clipping of primitives and division by w of vertices coordinates.
+      * Default depth range is [0, 1].
+      * NB : znear should be different from zfar or an assertion is raised
+      */
+    virtual void			setDepthRange(float znear, float zfar)
+    {
+        
+    };
+    // Get the current depth range
+    virtual	void			getDepthRange(float& znear, float& zfar) const
+    {
+        znear = 0;
+        zfar = 0;
+    };
+    // @}
+
+
+
+    /// \name Textures
+    // @{
+    /** is the texture is set up in the driver
+     *	NB: this method is thread safe.
+     */
+    virtual bool			isTextureExist(const NL3D::ITexture& tex)
+    {
+        return true;
+    };
+
+    /** setup a texture, generate and upload if needed. same as setupTextureEx(tex, true, dummy);
+     */
+    virtual bool			setupTexture(NL3D::ITexture& tex)
+    {
+        return true;
+    };
+    /** setup a texture in the driver.
+     *	\param bUpload if true the texture is created and uploaded to VRAM, if false the texture is only created
+     *  it is useful for the async upload texture to only create the texture and then make invalidate to upload
+     *  small piece each frame. There is ONE case where bUpload is forced to be true inside the method: if the texture
+     *	must be converted to RGBA. \see bAllUploaded
+     *	\param bAllUploaded true if any upload arise (texture invalid, must convert texture etc...).
+     *	\param bMustRecreateSharedTexture if true and if the texture supportSharing, then the texture is recreated
+     *	(and uploaded if bUpload==true) into the shared DrvInfo (if found). Default setup (false) imply that the DrvInfo
+     *	is only bound to tex (thus creating and uploading nothing)
+     *	NB: the texture must be at least touch()-ed for the recreate to work.
+     */
+    virtual bool			setupTextureEx(NL3D::ITexture& tex, bool bUpload, bool& bAllUploaded,
+        bool bMustRecreateSharedTexture = false)
+    {
+        return true;
+    };
+
+    /** The texture must be created or uploadTexture do nothing.
+     *  These function can be used to upload piece by piece a texture. Use it in conjunction with setupTextureEx(..., false);
+     *  For compressed textures, the rect must aligned on pixel block. (a block of pixel size is 4x4 pixels).
+     */
+    virtual bool			uploadTexture(NL3D::ITexture& tex, NLMISC::CRect& rect, uint8 nNumMipMap)
+    {
+        return true;
+    };
+    virtual bool			uploadTextureCube(NL3D::ITexture& tex, NLMISC::CRect& rect, uint8 nNumMipMap, uint8 nNumFace)
+    {
+        return true;
+    };
+    
+
+    /** if true force all the uncompressed RGBA 32 bits and RGBA 24 bits texture to be DXTC5 compressed.
+     *	Do this only during upload if ITexture::allowDegradation() is true and if ITexture::UploadFormat is "Automatic"
+     *	and if bitmap format is RGBA.
+     */
+    virtual void			forceDXTCCompression(bool dxtcComp)
+    {
+        
+    };
+
+    /** if different from 0, enable anisotropic filter on textures. -1 enables max value.
+     *	Default is 0.
+     */
+    virtual void			setAnisotropicFilter(sint filter)
+    {
+        
+    };
+
+    /**
+     * Get current anisotropic filter value
+     */
+    virtual uint			getAnisotropicFilter() const
+    {
+        return 0;
+    };
+
+
+
+    /**
+     * Get maximum anisotropic filter value
+     */
+    virtual uint			getAnisotropicFilterMaximum() const
+    {
+        return 0;
+    };
+
+    /** if !=1, force mostly all the textures (but TextureFonts lightmaps, interfaces  etc..)
+     *	to be divided by Divisor (2, 4, 8...)
+     *	Default is 1.
+     *	NB: this is done only on TextureFile
+     */
+    virtual void			forceTextureResize(uint divisor)
+    {
+        
+    };
+
+    /** Get the number of texture stage available, for multi texturing (Normal material shaders). Valid only after setDisplay().
+     */
+    virtual	uint			getNbTextureStages() const
+    {
+        return 0;
+    };
+
+    /** Get max number of per stage constant that can be used simultaneously.
+      * This will usually match the number of texture stages, but with a D3D driver, this feature is not available most of the time
+      * so it is emulated. If pixel shaders are available this will be fully supported.
+      * Under OpenGL this simply returns the maximum number of texture stages (getNbTextureStages) in both return values.
+      */
+    virtual void			getNumPerStageConstant(uint& lightedMaterial, uint& unlightedMaterial) const
+    {
+        lightedMaterial = 0;
+        unlightedMaterial = 0;
+    };
+
+    // [DEPRECATED] Return if this texture is a rectangle texture that requires RECT sampler (OpenGL specific pre-NPOT functionality)
+    virtual bool			isTextureRectangle(NL3D::ITexture* tex) const
+    {
+        return false;
+    };
+
+    // Return true if driver support non-power of two textures
+    virtual	bool			supportNonPowerOfTwoTextures() const
+    {
+        return false;
+    };
+    // @}
+
+
+
+    /// \name Texture operations
+    // @{
+    // copy the first texture in a second one of different dimensions
+    virtual bool			stretchRect(NL3D::ITexture* srcText, NLMISC::CRect& srcRect,
+        NL3D::ITexture* destText, NLMISC::CRect& destRect)
+    {
+        return true;
+    };
+    // @}
+
+
+
+    /// \name Material
+    // @{
+    virtual bool			setupMaterial(NL3D::CMaterial& mat)
+    {
+        return true;
+    };
+
+    /** Special for Faster Specular Setup. Call this between lot of primitives rendered with Specular Materials.
+     *	Visual Errors may arise if you don't correctly call endSpecularBatch().
+     */
+    virtual void			startSpecularBatch()
+    {
+        
+    };
+    virtual void			endSpecularBatch()
+    {
+        
+    };
+
+    /// \name Material multipass.
+    /**	NB: setupMaterial() must be called before those methods.
+     *  NB: This is intended to be use with the rendering of simple primitives.
+     *  NB: Other render calls performs the needed setup automatically
+     */
+     // @{
+     /// init multipass for _CurrentMaterial. return number of pass required to render this material.
+    virtual sint			beginMaterialMultiPass()
+    {
+        return 0;
+    };
+    /// active the ith pass of this material.
+    virtual void			setupMaterialPass(uint pass)
+    {
+        
+    };
+    /// end multipass for this material.
+    virtual void			endMaterialMultiPass()
+    {
+        
+    };
+    // @}
+
+    // Does the driver support the per-pixel lighting shader ? (legacy fixed-function technique)
+    virtual bool supportPerPixelLighting(bool specular) const
+    {
+        return true;
+    };
+    
+    /// Does the driver's builtin VP/PP support per-pixel lighting features?
+    /// When true, user shader programs may use the following CProgramFeatures:
+    ///   - InputsWorldSpaceNormal:    Request world-space normal at varying location 2.
+    ///   - InputsWorldSpacePosition:  Request PZB-relative world-space position at varying location 0.
+    ///   - OutputsWorldSpacePosition: Indicate that a user VP outputs world-space position at location 0.
+    /// These enable GLSL per-pixel lighting in user PPs (light direction, attenuation, etc.).
+    /// The builtin PP adapts fog to use world-space distance when position is in world space.
+    virtual bool supportWorldSpacePPL() const
+    {
+        return true;
+    };
+    // @}
+
+
+
+    /// \name Camera
+    // @{
+    // Setup the camera mode as a perspective/ortho camera. NB: znear and zfar must be >0 (if perspective).
+    virtual void			setFrustum(float left, float right, float bottom,
+        float top, float znear, float zfar, bool perspective = true)
+    {
+        
+    };
+    virtual	void			setFrustumMatrix(NL3D::CMatrix& frust)
+    {
+        
+    };
+    virtual	NL3D::CMatrix			getFrustumMatrix()
+    {
+        return NL3D::CMatrix();
+    };
+
+    virtual float			getClipSpaceZMin() const
+    {
+        return 0.0f;
+    };
+
+    /** setup the view matrix (inverse of camera matrix).
+     *
+     * NB: you must setupViewMatrix() BEFORE setupModelMatrix(), or else undefined results.
+     */
+    virtual void			setupViewMatrix(const NL3D::CMatrix& mtx)
+    {
+        
+    };
+
+    /** setup the view matrix (inverse of camera matrix).
+     *	Extended: give a cameraPos (mtx.Pos() is not taken into account but for getViewMatrix()),
+     *	so the driver use it to remove translation from all ModelMatrixes (and lights pos).
+     *	This approach improves greatly ZBuffer precision.
+     *
+     *	This is transparent to user, and getViewMatrix() return mtx (as in setupViewMatrix()).
+     *
+     * NB: you must setupViewMatrixEx() BEFORE setupModelMatrix(), or else undefined results.
+     *
+     * \param mtx the same view matrix (still with correct "inversed" camera position) as if passed in setupViewMatrix()
+     * \param cameraPos position of the camera (before inversion, ie mtx.getPos()!=cameraPos ).
+     */
+    virtual void			setupViewMatrixEx(const NL3D::CMatrix& mtx, const NL3D::CVector& cameraPos)
+    {
+        
+    };
+
+    /** setup the model matrix.
+     *
+     * NB: you must setupModelMatrix() AFTER setupViewMatrix(), or else undefined results.
+     */
+    virtual void			setupModelMatrix(const NL3D::CMatrix& mtx)
+    {
+        
+    };
+
+    virtual NL3D::CMatrix			getViewMatrix() const
+    {
+        return NL3D::CMatrix();
+    }
+    // @}
+
+
+
+    /// \name Fixed pipeline vertex program
+    // @{
+    /** Force input normal to be normalized by the driver. default is false.
+     * NB: driver force the normalization himself if:
+     *		- current Model matrix has a scale.
+     */
+    virtual	void			forceNormalize(bool normalize)
+    {
+        
+    };
+
+
+    /** return the forceNormalize() state.
+     */
+    virtual	bool			isForceNormalize() const
+    {
+        return false;
+    };
+    // @}
+
+
+
+    /// \name Vertex Buffer Hard: Features
+    // @{
+    /** return true if driver support VertexBufferHard.
+     */
+    virtual	bool			supportVertexBufferHard() const
+    {
+        return true;
+    };
+
+    /** return true if volatile vertex buffer are supported. (e.g. FullStream or SmallStream usage)
+     *  If these are not supported, a RAM vb is created instead (transparent to user)
+     */
+    virtual bool			supportVolatileVertexBuffer() const
+    {
+        return true;
+    };
+
+    /** return true if driver support indices offset. That is, allow to specify a constant value that is added to each
+      * index in current active active index buffer when rendering indexed primitives
+      */
+    virtual bool			supportIndexOffset() const
+    {
+        return true;
+    };
+
+    /** return true if driver support VertexBufferHard, but vbHard->unlock() are slow (ATI-openGL).
+     */
+    virtual	bool			slowUnlockVertexBufferHard() const
+    {
+        return false;
+    };
+
+    /** return true if the driver pipelines multiple frames with fence-based sync,
+     *  enabling UnsynchronizedWrite buffers with caller-managed deferred freeing.
+     */
+    virtual bool			isTripleBufferPipelined() const
+    {
+        return false;
+    };
+
+    /** return the counter value of the oldest frame whose GPU work is still in flight.
+     *  Vertices stamped with a frame counter < this value are safe to reuse.
+     */
+    virtual uint64			getSwapBufferInFlight() const
+    {
+        return 1;
+    };
+    // @}
+
+
+
+    /// \name Vertex Buffer Hard: Settings
+    // @{
+    /* Returns true if static vertex and index buffers must by allocated in VRAM, false in AGP.
+     * Default is false.
+     */
+    virtual bool					getStaticMemoryToVRAM() const
+    {
+        return false;
+    };
+
+    /* Set to true if static vertex and index buffers must by allocated in VRAM, false in AGP.
+     * Default is true.
+     */
+    virtual void					setStaticMemoryToVRAM(bool staticMemoryToVRAM)
+    {
+    };
+
+    /** return How many vertices VertexBufferHard support
+     */
+    virtual	uint			getMaxVerticesByVertexBufferHard() const
+    {
+        return 0;
+    };
+    // @}
+
+
+
+    /// \name Vertex Buffer Hard
+    // @{
+    /** Allocate the initial VertexArray Memory. (no-op if !supportVertexBufferHard()).
+     *	VertexArrayRange is first reseted, so any VBhard created before will be deleted.
+     *	NB: call it after setDisplay(). But setDisplay() by default call initVertexBufferHard(16Mo, 0);
+     *	so this is not necessary.
+     *	NB: If allocation fails, mem/=2, and retry, until mem < 500K.
+     *	\param agpMem amount of AGP Memory required. if 0, reseted.
+     *	\param vramMem amount of VRAM Memory required. if 0, reseted.
+     *	\return false if one the Buffer has not been allocated (at least at 500K).
+     */
+    virtual	bool			initVertexBufferHard(uint agpMem, uint vramMem = 0)
+    {
+        return true;
+    };
+
+    /** Return the amount of AGP memory allocated by initVertexBufferHard() to store vertices.
+    */
+    virtual uint32			getAvailableVertexAGPMemory()
+    {
+        return 999;
+    };
+
+    /** Return the amount of video memory allocated by initVertexBufferHard() to store vertices.
+    */
+    virtual uint32			getAvailableVertexVRAMMemory()
+    {
+        return 999;
+    };
+    // @}
+
+
+
+    /// \name Vertex Buffer Objects
+    // @{
+    /** active a current VB, for future render().
+     * This method suppose that all vertices in the VB will be used.
+     *
+     * NB: please make sure you have setuped / unsetuped the current vertex program BEFORE activate the vertex buffer.
+     * Don't change the vertex buffer format/size after having activated it.
+     * Don't lock the vertex buffer after having activated it.
+     *
+     * \see activeVertexProgram
+     */
+    virtual bool			activeVertexBuffer(NL3D::CVertexBuffer& VB)
+    {
+        return true;
+    };
+
+    /** active a current IB, for future render().
+     *
+     * Don't change the index buffer format/size after having activated it.
+     * Don't lock the index buffer after having activated it.
+     */
+    virtual bool			activeIndexBuffer(NL3D::CIndexBuffer& IB)
+    {
+        return true;
+    };
+    // @}
+
+
+
+    /// \name Rendering
+    // @{
+    /** Render a list of indexed lines with previously setuped VertexBuffer / IndexBuffer / Matrixes.
+     *  \param mat is the material to use during this rendering
+     *  \param firstIndex is the first index in the index buffer to use as first line.
+     *  \param nlines is the number of line to render.
+     */
+    virtual bool			renderLines(NL3D::CMaterial& mat, uint32 firstIndex, uint32 nlines)
+    {
+        return true;
+    };
+
+    /** Render a list of indexed triangles with previously setuped VertexBuffer / IndexBuffer / Matrixes.
+     *  \param mat is the material to use during this rendering
+     *  \param firstIndex is the first index in the index buffer to use as first triangle.
+     *  \param ntris is the number of triangle to render.
+     */
+    virtual bool			renderTriangles(NL3D::CMaterial& mat, uint32 firstIndex, uint32 ntris)
+    {
+        return true;
+    };
+
+    /** Render a list of triangles with previously setuped VertexBuffer / IndexBuffer / Matrixes, AND previously setuped MATERIAL!!
+     * This use the last material setuped. It should be a "Normal shader" material, because no multi-pass is allowed
+     * with this method.
+     * Actually, it is like a straight drawTriangles() in OpenGL.
+     * NB: nlassert() if ntris is 0!!!! this is unlike other render() call methods. For optimisation concern.
+     * NB: this is useful for landscape....
+     *  \param firstIndex is the first index in the index buffer to use as first triangle.
+     *  \param ntris is the number of triangle to render.
+     */
+    virtual bool			renderSimpleTriangles(uint32 firstIndex, uint32 ntris)
+    {
+        return true;
+    };
+
+    /** Render points with previously setuped VertexBuffer / Matrixes.
+     *  Points are stored as a sequence in the vertex buffer.
+     *  \param mat is the material to use during this rendering
+     *  \param startVertex is the first vertex to use during this rendering.
+     *  \param numPoints is the number of point to render.
+     */
+    virtual bool			renderRawPoints(NL3D::CMaterial& mat, uint32 startVertex, uint32 numPoints)
+    {
+        return true;
+    };
+
+    /** Render lines with previously setuped VertexBuffer / Matrixes.
+     *  Lines are stored as a sequence in the vertex buffer.
+     *  \param mat is the material to use during this rendering
+     *  \param startVertex is the first vertex to use during this rendering.
+     *  \param numLine is the number of line to render.
+     */
+    virtual bool			renderRawLines(NL3D::CMaterial& mat, uint32 startVertex, uint32 numLine)
+    {
+        return true;
+    };
+
+
+
+    /** Render triangles with previously setuped VertexBuffer / Matrixes.
+     *  Triangles are stored as a sequence in the vertex buffer.
+     *  \param mat is the material to use during this rendering
+     *  \param startVertex is the first vertex to use during this rendering.
+     *  \param numTri is the number of triangle to render.
+     */
+    virtual bool			renderRawTriangles(NL3D::CMaterial& mat, uint32 startVertex, uint32 numTri)
+    {
+        return true;
+    };
+
+    /** If the driver support it, primitive can be rendered with an offset added to each index
+      * These are the offseted version of the 'render' functions
+      * \see supportIndexOffset
+      */
+    virtual bool			renderLinesWithIndexOffset(NL3D::CMaterial& mat, uint32 firstIndex, uint32 nlines, uint indexOffset)
+    {
+        return true;
+    };
+    virtual bool			renderTrianglesWithIndexOffset(NL3D::CMaterial& mat, uint32 firstIndex, uint32 ntris, uint indexOffset)
+    {
+        return true;
+    };
+    virtual bool			renderSimpleTrianglesWithIndexOffset(uint32 firstIndex, uint32 ntris, uint indexOffset)
+    {
+        return true;
+    };
+
+
+    /** render quads with previously setuped VertexBuffer / Matrixes.
+     *  Quads are stored as a sequence in the vertex buffer.
+     * There's a guaranty for the orientation of its diagonal, which is drawn as follow :
+     *
+     *  3----2
+     *  |  / |
+     *  | /  |
+     *  |/   |
+     *  0----1
+     *
+     *  \param mat is the material to use during this rendering
+     *  \param startVertex is the first vertex to use during this rendering.
+     *  \param numQuad is the number of quad to render.
+     */
+    virtual bool			renderRawQuads(NL3D::CMaterial& mat, uint32 startVertex, uint32 numQuads)
+    {
+        return true;
+    };
+    // @}
+
+
+
+    /// \name Texture coordinates fixed pipeline
+    // @{
+    /** Say what Texture Stage use what UV coord.
+     *	by default activeVertexBuffer*() methods map all stage i to UV i. You can change this behavior,
+     *	after calling activeVertexBuffer*(), by using this method.
+     *
+     *	eg: mapTextureStageToUV(0,2) will force the 0th texture stage to use the 2th UV.
+     *
+     *	Warning! This DOESN'T work with VertexProgram enabled!! (assert)
+     *
+     *	Warning!: some CMaterial Shader may change automatically this behavior too when setupMaterial()
+     *	(and so render*()) is called. But Normal shader doesn't do it.
+     */
+    virtual void			mapTextureStageToUV(uint stage, uint uv)
+    {
+    };
+    // @}
+
+
+
+    /// \name Buffer swapping
+    // @{
+    /// Swap the back and front buffers.
+    virtual bool			swapBuffers()
+    {
+        return true;
+    };
+
+    /** Non-blocking check whether the GPU is ready for the next frame.
+     *  Returns true if we can render, false if the GPU is still processing
+     *  previous frames. On Emscripten/WebGL, callers should skip the frame
+     *  to avoid blocking the browser's event loop.
+     *  Default implementation returns true (always ready).
+     */
+    virtual bool			isFrameReady() { return true; }
+
+    /** set the number of VBL wait when a swapBuffers() is issued. 0 means no synchronisation to the VBL
+     *	Default is 1. Values >1 may be clamped to 1 by the driver.
+     */
+    virtual void			setSwapVBLInterval(uint interval)
+    {
+    };
+    /// get the number of VBL wait when a swapBuffers() is issued. 0 means no synchronisation to the VBL
+    virtual uint			getSwapVBLInterval()
+    {
+        return 0;
+    };
+    // @}
+
+
+
+
+
+    /// \name Profiling.
+    // @{
+    /** Get the number of primitives rendered from the last swapBuffers() call.
+     *	\param pIn the number of requested rendered primitive.
+     *	\param pOut the number of effective rendered primitive. pOut==pIn if no multi-pass material is used
+     *	(Lightmap, Specular ...).
+     */
+    virtual void			profileRenderedPrimitives(NL3D::CPrimitiveProfile& pIn, NL3D::CPrimitiveProfile& pOut)
+    {
+    };
+
+    /** Return the amount of Texture memory requested. taking mipmap, compression, texture format, etc... into account.
+     *	NB: because of GeForce*, RGB888 is considered to be 32 bits. So it may be false for others cards :).
+     */
+    virtual uint32			profileAllocatedTextureMemory()
+    {
+        return 0;
+    };
+
+    /** Get the number of material setuped from the last swapBuffers() call.
+     */
+    virtual uint32			profileSetupedMaterials() const
+    {
+        return 0;
+    };
+
+    /** Get the number of matrix setuped from the last swapBuffers() call.
+     */
+    virtual uint32			profileSetupedModelMatrix() const
+    {
+        return 0;
+    };
+
+    /** Enable the sum of texture memory used since last swapBuffers() call. To retrieve the memory used call getUsedTextureMemory().
+     */
+    virtual void			enableUsedTextureMemorySum(bool enable = true)
+    {
+        
+    };
+
+    /** Return the amount of texture video memory used since last swapBuffers() call. Before use this method, you should enable
+     *  the sum with enableUsedTextureMemorySum().
+     */
+    virtual uint32			getUsedTextureMemory() const
+    {
+        return 0;
+    };
+
+    /** If the driver support it, enable profile VBHard locks.
+     *	No-Op if already profiling
+     */
+    virtual void			startProfileVBHardLock()
+    {
+        
+    };
+
+    /** If the driver support it, stop profile VBHard locks, and "print" result
+     *	No-Op if already profiling
+     *	NB: The results are the Locks in Chronological time (since last swapBuffers).
+     *	Since multiple frame are summed, an "*" is marked against the VBHard name to show if it was not
+     *	always this one (ptr test and not name test) in the chronological order.
+     *	NB: if the driver does not support VBHard or VBHard profiling (like ATI VBHard), result is empty.
+     *	NB: ???? string is displayed if the VBHard has no name or if was just deleted.
+     */
+    virtual void			endProfileVBHardLock(std::vector<std::string>& result)
+    {
+        
+    };
+
+    /** display VBhards allocated
+     */
+    virtual void			profileVBHardAllocation(std::vector<std::string>& result)
+    {
+        
+    };
+
+    // Index buffer profiling, same use than with vertex buffers
+    virtual void			startProfileIBLock()
+    {
+        
+    };
+    virtual void			endProfileIBLock(std::vector<std::string>& result)
+    {
+        
+    };
+    virtual void			profileIBAllocation(std::vector<std::string>& result)
+    {
+        
+    };
+
+    /** For each texture setuped in the driver, "print" result: type, shareName, format and size (mipmap included)
+     */
+    virtual void			profileTextureUsage(std::vector<std::string>& result)
+    {
+        
+    };
+    // @}
+
+
+    virtual bool			fogEnabled()
+    {
+        return true;
+    };
+    virtual void			enableFog(bool enable = true)
+    {
+        
+    };
+    /// setup fog parameters. fog must enabled to see result. start and end are distance values.
+    virtual void			setupFog(float start, float end, NLMISC::CRGBA color)
+    {
+        
+    };
+    /// setup fog mode and density. mode/density are orthogonal to start/end/color.
+    virtual void			setupFogMode(TFogMode mode = FogLinear, float density = 1.f)
+    {
+        
+    };
+    /// Get.
+    virtual float			getFogStart() const
+    {
+        return 0.0f;
+    };
+    virtual float			getFogEnd() const
+    {
+        return 0.0f;
+    };
+    virtual NLMISC::CRGBA	getFogColor() const
+    {
+        return NLMISC::CRGBA::White;
+    };
+    virtual TFogMode		getFogMode() const
+    {
+        return FogLinear;
+    };
+    virtual float			getFogDensity() const
+    {
+        return 0.f;
+    };
+    // @}
+
+
+
+    /// \name Viewport
+    // @{
+    /** Set the current viewport
+      *
+      * \param viewport is a viewport to setup as current viewport.
+      */
+    virtual void			setupViewport(const class NL3D::CViewport& viewport)
+    {
+        
+    };
+
+    /** Get the current viewport
+      */
+    virtual void			getViewport(NL3D::CViewport& viewport)
+    {
+        
+    };
+
+    /** Set the current Scissor.
+      * \param scissor is a scissor to setup the current Scissor, in Window relative coordinate (0,1).
+      */
+    virtual void			setupScissor(const class NL3D::CScissor& scissor)
+    {
+        
+    };
+    // @}
+
+
+
+    /// \name Driver information
+    // @{
+    /**
+      * Get the driver version. Not the same than interface version. Incremented at each implementation change.
+      *
+      * \see InterfaceVersion
+      */
+    virtual uint32			getImplementationVersion() const
+    {
+        return 0;
+    };
+
+    /**
+      * Get driver information.
+      * get the nel name of the driver (ex: "Opengl 1.2 NeL Driver")
+      */
+    virtual const char* getDriverInformation()
+    {
+        return "DummyDriver";
+    };
+
+    /**
+      * Get videocard information.
+      * get the official name of the driver
+      */
+    virtual const char* getVideocardInformation()
+    {
+        return "DummyVideocard";
+    };
+
+    /**
+      * Get total video memory.
+      * get the amount of video memory of current adapter, result is in KiB, -1 if unable to determine
+      */
+    virtual sint			getTotalVideoMemory() const
+    {
+        return 0;
+    };
+    // @}
+
+
+
+    /// \name Mouse / Keyboard / Game devices
+    // @{
+    /// show cursor if b is true, or hide it if b is false
+    virtual void			showCursor(bool b)
+    {
+        
+    };
+
+    /// x and y must be between 0.0 and 1.0
+    virtual void			setMousePos(float x, float y)
+    {
+        
+    };
+
+    /** If true, capture the mouse to force it to stay under the window.
+      * NB : this has no effects if a low level mouse is used
+      */
+    virtual void			setCapture(bool b)
+    {
+        
+    };
+
+    // see if system cursor is currently captured
+    virtual bool			isSystemCursorCaptured()
+    {
+        return false;
+    };
+
+    // Add a new cursor (name is case unsensitive)
+    virtual void			addCursor(const std::string& name, const NLMISC::CBitmap& bitmap)
+    {
+        
+    };
+
+    // Display a cursor from its name (case unsensitive)
+    virtual void			setCursor(const std::string& name, NLMISC::CRGBA col, uint8 rot,
+        sint hotSpotX, sint hotSpotY, bool forceRebuild = false)
+    {
+
+    };
+
+    // Change default scale for all cursors
+    virtual void			setCursorScale(float scale)
+    {
+        
+    };
+    // @}
+
+
+
+    /// \name Render target // TODO: Handle Color/ZBuffer/Stencil consistently
+    // @{
+    /** Set the current render target.
+      *
+      * The render target can be a texture (tex pointer) or the back buffer (tex = NULL).
+      * The texture must have been right sized before the call.
+      * This mark the texture as valid, but doesn't copy data to system memory.
+      * This also mean that regenerating texture data will erase what
+      * has been copied before in the device memory.
+      * This doesn't work with compressed textures.
+      * Ideally, the FrameBuffer should have the same format than the texture.
+      *
+      * When direct render to texture is not available (openGl), it uses the frame buffer for the rendering and copy the frame buffer
+      * content into the texture when setRenderTarget(NULL) is called.
+      *
+      * The x, y, width and height parameters are only used in this case to optimize the copy from the framebuffer
+      * to the texture.
+      *
+      * If a texture is set as target, the viewport and the scissor are now relative to the texture sizes,
+      * and not to the x, y, width and height parameters.
+      *
+      * The texture content can be lost after the first setRenderTarget().
+      *
+      * The texture must have the render target abilities enabled. (ITexture::setRenderTarget ())
+      *
+      * \param tex					the texture to render into.
+      * \param x					x position within the destination texture of the renderable area.
+      * \param y					y position within the destination texture of the renderable area.
+      * \param width				width of the renderable area, if 0, use the whole size.
+      * \param height				height of the renderable area, if 0, use the whole size.
+      * \param mipmapLevel			the mipmap to copy texture to.
+      * \param cubaFace				the face of the cube to copy texture to.
+      * \return true if the render target has been changed
+      */
+    virtual bool			setRenderTarget(NL3D::ITexture* tex,
+        uint32 x = 0,
+        uint32 y = 0,
+        uint32 width = 0,
+        uint32 height = 0,
+        uint32 mipmapLevel = 0,
+        uint32 cubeFace = 0
+    )
+    {
+        return true;
+    }
+
+    virtual NL3D::ITexture* getRenderTarget() const
+    {
+        return nullptr;
+    }
+
+    /** Retrieve the render target size.
+      * If the render target is the frame buffer, it returns the size of the frame buffer.
+      * It the render target is a texture, it returns the size of the texture mipmap selected as render target.
+      */
+    virtual bool			getRenderTargetSize(uint32& width, uint32& height)
+    {
+        return true;
+    };
+
+    /** Trick method : copy the current texture target into another texture without updating the current texture.
+      *
+      * This method copies the current texture into another texture.
+      * WARNING : at the next setRenderTarget () call, the current texture target WILL NOT BE UPDATED.
+      *
+      * When direct render to texture is not available, this method can save a texture copy :
+      *
+      * Use this method to copy a temporary texture target into a destination texture.
+      * Then, resets the rendering target with setRenderTarget().
+      *
+      * The temporary texture is copied into the final texture direct from the frame buffer. The temporary texture is not filled in VRAM when
+      * the framebuffer is set back as render target.
+      *
+      * Works only if a texture is used as render target.
+      *
+      * This method invalidates the vertex buffer, the view and model matrices, the viewport and the frustum.
+      *
+      * \param tex					the texture to render into.
+      * \param offsetx				x position within the destination texture.
+      * \param y					y position within the destination texture.
+      * \param x					x position within the current texture target.
+      * \param y					y position within the current texture target.
+      * \param width				width of the renderable area to copy, if 0, use the whole size.
+      * \param height				height of the renderable area  to copy, if 0, use the whole size.
+      * \param mipmapLevel			the mipmap to copy texture to.
+      */
+    virtual bool			copyTargetToTexture(NL3D::ITexture* tex,
+        uint32 offsetx = 0,
+        uint32 offsety = 0,
+        uint32 x = 0,
+        uint32 y = 0,
+        uint32 width = 0,
+        uint32 height = 0,
+        uint32 mipmapLevel = 0
+    )
+    {
+        return true;
+    }
+    // @}
+
+    /// Hack for bloom
+    virtual bool			textureCoordinateAlternativeMode() const
+    {
+        return true;
+    };
+
+
+
+    /// \name Render state: Polygon mode
+    // @{
+    /** Set the global polygon mode. Can be filled, line or point. The implementation driver must
+      * call IDriver::setPolygonMode and active this mode.
+      *
+      * \param polygon mode choose in this driver.
+      * \see getPolygonMode(), TPolygonMode
+      */
+    virtual void			setPolygonMode(TPolygonMode mode)
+    {
+        
+    }
+
+
+    /// \name Fixed pipeline lights
+    // @{
+    /**
+      * return the number of light supported by driver. typically 8.
+      *
+      * \see enableLight() setLight()
+      */
+    virtual uint			getMaxLight() const
+    {
+        return 8;
+    };
+
+    /**
+      * Setup a light.
+      *
+      * You must call enableLight() to active the light.
+      *
+      * \param num is the number of the light to set.
+      * \param light is a light to set in this slot.
+      * \see enableLight()
+      */
+    virtual void			setLight(uint8 num, const NL3D::CLight& light)
+    {
+
+    };
+
+    /**
+      * Enable / disable light.
+      *
+      * You must call setLight() if you active the light.
+      *
+      * \param num is the number of the light to enable / disable.
+      * \param enable is true to enable the light, false to disable it.
+      * \see setLight()
+      */
+    virtual void			enableLight(uint8 num, bool enable = true)
+    {
+
+    };
+
+    /**
+      * Set ambient.
+      *
+      * \param color is the new global ambient color for the scene.
+      * \see setLight(), enableLight()
+      */
+    virtual void			setAmbientColor(NLMISC::CRGBA color)
+    {
+
+    };
+
+    /** Setup the light used for per pixel lighting. The given values should have been modulated by the material diffuse and specular.
+      * This is only useful for material that have their shader set as 'PerPixelLighting'
+      * \param the light used for per pixel lighting
+      */
+    virtual void			setPerPixelLightingLight(NLMISC::CRGBA diffuse, NLMISC::CRGBA specular, float shininess)
+    {
+
+    };
+
+    /** Setup the unique light used for Lightmap Shader.
+      *	Lightmaped primitives are lit per vertex with this light (should be local attenuated for maximum efficiency)
+      * This is only useful for material that have their shader set as 'LightMap'
+      * \param the light used for per pixel lighting
+      */
+    virtual void			setLightMapDynamicLight(bool enable, const NL3D::CLight& light)
+    {
+
+    };
+    // @}
+
+
+    /** \name Light Table
+      *
+      * The light table is a resizable array of CLight entries in the driver,
+      * populated once per frame. Each unique scene light (sun, point lights)
+      * is uploaded once via setLightTableEntry(). Per-object rendering then
+      * references lights by table index + influence factor through setLights(),
+      * rather than uploading fully modulated CLight data per draw call.
+      *
+      * Two modes:
+      * - **Table mode** (scene rendering): enableLightTableMode(true). Lights
+      *   are set up via setLightTableEntry() and selected per object via
+      *   setLights(). The legacy setLight()/enableLight() calls are not used.
+      * - **Legacy mode** (samples, UI, debug): enableLightTableMode(false).
+      *   setLight()/enableLight() work as before.
+      *
+      * setLights() applies per-object factor modulation internally: each
+      * factor (0-255) scales the table entry's diffuse and specular colors.
+      * The ambient parameter replaces the ambient of slot 0 (sun); point
+      * light slots receive black ambient.
+      */
+      // @{
+
+      /// Return the maximum number of entries the light table can hold.
+      /// Drivers without a fixed limit (legacy, no UBO) return UINT_MAX.
+    virtual uint getMaxLightTableSize() const { return (uint)~0; }
+
+    /// Enable or disable light table mode. When disabled, legacy setLight()/enableLight() resumes.
+    virtual void enableLightTableMode(bool enable)
+    {
+
+    };
+
+    /// Resize the light table. Existing entries beyond the new size are discarded.
+    virtual void setLightTableSize(uint count)
+    {
+        
+    };
+
+    /// Set a light table entry. The light is stored as-is (no factor modulation).
+    virtual void setLightTableEntry(uint index, const NL3D::CLight& light)
+    {
+        
+    };
+
+    /** Set the active lights for the current object from the light table.
+      * \param tableIndices       Array of indices into the light table. Slot 0 is the sun.
+      * \param factors            Parallel array of influence factors (0-255) per light.
+      * \param numLights          Number of entries in tableIndices/factors.
+      * \param numPerPixelLights  First N lights evaluated per-pixel in PP (0 = all VP).
+      * \param ambient            Per-object ambient color, written to slot 0's ambient.
+      */
+    virtual void setLights(
+        const sint16* tableIndices,
+        const uint8* factors,
+        uint numLights,
+        uint numPerPixelLights,
+        NLMISC::CRGBA ambient)
+    {
+        
+    };
+
+    // @}
+
+
+
+    /// \name Vertex Program
+    // @{
+
+    // Order of preference
+    // - activeVertexProgram
+    // - CMaterial pass[n] VP (uses activeVertexProgram, but does not override if one already set by code)
+    // - default generic VP that mimics fixed pipeline / no VP with fixed pipeline
+
+    /**
+      * Does the driver supports vertex program, but emulated by CPU ?
+      */
+    virtual bool			isVertexProgramEmulated() const
+    {
+        return false;
+    }
+
+    /** Return true if the driver supports builtin UBOs for vertex programs
+      * (NlCamera, NlLightTable, NlModel). When true, user VPs can use
+      * UsesObjectUBO/UsesLightTableUBO/UsesCameraUBO feature flags.
+      */
+    virtual bool			supportBuiltinUBO() const { return false; }
+
+    /** Return true if the driver supports the specified vertex program profile.
+      */
+    virtual bool			supportVertexProgram(NL3D::CVertexProgram::TProfile profile) const
+    {
+        return true;
+    };
+
+    /** Compile the given vertex program, return if successful.
+      * If a vertex program was set active before compilation,
+      * the state of the active vertex program is undefined behaviour afterwards.
+      */
+    virtual bool			compileVertexProgram(NL3D::CVertexProgram* program)
+    {
+        return true;
+    };
+
+    /** Set the active vertex program. This will override vertex programs specified in CMaterial render calls.
+      * Also used internally by setupMaterial(CMaterial) when getVertexProgram returns NULL.
+      * The vertex program is activated immediately.
+      */
+    virtual bool			activeVertexProgram(NL3D::CVertexProgram* program)
+    {
+        return true;  
+    };
+    // @}
+
+
+
+    /// \name Pixel Program
+    // @{
+
+    // Order of preference
+    // - activePixelProgram
+    // - CMaterial pass[n] PP (uses activePixelProgram, but does not override if one already set by code)
+    // - PP generated from CMaterial (uses activePixelProgram, but does not override if one already set by code)
+
+    /** Return true if the driver supports the specified pixel program profile.
+      */
+    virtual bool			supportPixelProgram(NL3D::CPixelProgram::TProfile profile) const
+    {
+        return true;
+    };
+
+    /** Compile the given pixel program, return if successful.
+      * If a pixel program was set active before compilation,
+      * the state of the active pixel program is undefined behaviour afterwards.
+      */
+    virtual bool			compilePixelProgram(NL3D::CPixelProgram* program)
+    {
+        return true;
+    };
+
+    /** Set the active pixel program. This will override pixel programs specified in CMaterial render calls.
+      * Also used internally by setupMaterial(CMaterial) when getPixelProgram returns NULL.
+      * The pixel program is activated immediately.
+      */
+    virtual bool			activePixelProgram(NL3D::CPixelProgram* program)
+    {
+        return true;
+    };
+    // @}
+
+
+
+    /// \name Geometry Program
+    // @{
+
+    // Order of preference
+    // - activeGeometryProgram
+    // - CMaterial pass[n] PP (uses activeGeometryProgram, but does not override if one already set by code)
+    // - none
+
+    /** Return true if the driver supports the specified pixel program profile.
+      */
+    virtual bool			supportGeometryProgram(NL3D::CGeometryProgram::TProfile profile) const
+    {
+        return true;
+    };
+
+    /** Compile the given pixel program, return if successful.
+      * If a pixel program was set active before compilation,
+      * the state of the active pixel program is undefined behaviour afterwards.
+      */
+    virtual bool			compileGeometryProgram(NL3D::CGeometryProgram* program)
+    {
+        return true;
+    };
+
+    /** Set the active pixel program. This will override pixel programs specified in CMaterial render calls.
+      * Also used internally by setupMaterial(CMaterial) when getGeometryProgram returns NULL.
+      * The pixel program is activated immediately.
+      */
+    virtual bool			activeGeometryProgram(NL3D::CGeometryProgram* program)
+    {
+        return true;
+    };
+    // @}
+
+
+
+    /// \name Program parameters
+    // @{
+    // Set parameters
+    virtual void			setUniform1f(TProgram program, uint index, float f0)
+    {
+        
+    };
+    virtual void			setUniform2f(TProgram program, uint index, float f0, float f1)
+    {
+        
+    };
+    virtual void			setUniform3f(TProgram program, uint index, float f0, float f1, float f2)
+    {
+        
+    };
+    virtual void			setUniform4f(TProgram program, uint index, float f0, float f1, float f2, float f3)
+    {
+        
+    };
+    virtual void			setUniform1i(TProgram program, uint index, sint32 i0)
+    {
+        
+    };
+    virtual void			setUniform2i(TProgram program, uint index, sint32 i0, sint32 i1)
+    {
+        
+    };
+    virtual void			setUniform3i(TProgram program, uint index, sint32 i0, sint32 i1, sint32 i2)
+    {
+        
+    };
+    virtual void			setUniform4i(TProgram program, uint index, sint32 i0, sint32 i1, sint32 i2, sint32 i3)
+    {
+        
+    };
+    virtual void			setUniform1ui(TProgram program, uint index, uint32 ui0)
+    {
+        
+    };
+    virtual void			setUniform2ui(TProgram program, uint index, uint32 ui0, uint32 ui1)
+    {
+        
+    };
+    virtual void			setUniform3ui(TProgram program, uint index, uint32 ui0, uint32 ui1, uint32 ui2)
+    {
+        
+    };
+    virtual void			setUniform4ui(TProgram program, uint index, uint32 ui0, uint32 ui1, uint32 ui2, uint32 ui3)
+    {
+        
+    };
+    virtual void			setUniform3f(TProgram program, uint index, const NLMISC::CVector& v)
+    {
+        
+    };
+    virtual void			setUniform4f(TProgram program, uint index, const NLMISC::CVector& v, float f3)
+    {
+        
+    };
+    virtual void			setUniform4f(TProgram program, uint index, const NLMISC::CRGBAF& rgba)
+    {
+        
+    };
+    virtual void			setUniform4x4f(TProgram program, uint index, const NLMISC::CMatrix& m)
+    {
+        
+    };
+    virtual void			setUniform4fv(TProgram program, uint index, size_t num, const float* src)
+    {
+        
+    };
+    virtual void			setUniform4iv(TProgram program, uint index, size_t num, const sint32* src)
+    {
+        
+    };
+    virtual void			setUniform4uiv(TProgram program, uint index, size_t num, const uint32* src)
+    {
+        
+    };
+    // Set builtin parameters
+    /**
+      * Setup uniforms with a current matrix.
+      *
+      *	This call must be done after setFrustum(), setupViewMatrix() or setupModelMatrix() to get correct
+      *	results.
+      *
+      * \param index is the base constant index where to store the matrix. This index must be a multiple of 4.
+      * \param matrix is the matrix id to store in the constants
+      * \param transform is the transformation to apply to the matrix before store it in the constants.
+      *
+      */
+    virtual void			setUniformMatrix(TProgram program, uint index, TMatrix matrix, TTransform transform)
+    {
+
+    };
+    /**
+      * Setup the uniform with the fog vector. This vector must be used to get the final fog value in a vertex shader.
+      * You must use it like this:
+      * DP4 o[FOGC].x, c[4], R4;
+      * With c[4] the constant used for the fog vector and R4 the vertex local position.
+      *
+      *	This call must be done after setFrustum(), setupViewMatrix(), setupModelMatrix() and setupFog() to get correct
+      *	results.
+      *
+      * \param index is the index where to store the vector.
+      *
+      */
+    virtual void			setUniformFog(TProgram program, uint index)
+    {
+        
+    };
+    // Set feature parameters
+    virtual bool			isUniformProgramState()
+    {
+        return true;
+    };
+
+    /// Bind a user uniform buffer to a binding point. Creates GPU buffer on first use,
+    /// uploads if dirty. Pass NULL to unbind.
+    virtual bool			bindUniformBuffer(NL3D::TUBBinding binding, NL3D::CUniformBuffer* ub)
+    {
+        return true;
+    };
+    // @}
+
+
+
+    /// \name Legacy effects
+    // @{
+    // test if support for cloud render in a single pass
+    virtual	bool			supportCloudRenderSinglePass() const
+    {
+        return true;
+    };
+    // [FIXME] Return true if driver support Bloom effect // FIXME: This is terrible
+    virtual	bool			supportBloomEffect() const
+    {
+        return true;
+    };
+    // @}
+
+
+
+    /// \name Backface color
+    // @{
+    /// Check if the driver support double sided colors vertex programs
+    virtual bool		    supportVertexProgramDoubleSidedColor() const
+    {
+        return true;
+    };
+    /**
+      * Activate VertexProgram 2Sided Color mode. In 2Sided mode, the BackFace (if material 2Sided enabled) read the
+      *	result from o[BFC0], and not o[COL0].
+      *	default is false. you should reset to false after use.
+      * NB: no-op if not supported by driver
+      */
+    virtual	void			enableVertexProgramDoubleSidedColor(bool doubleSided)
+    {
+        
+    };
+    // @}
+
+
+
+    /// \name Texture addressing modes aka textures/pixels shaders
+    // @{
+    /// test whether the device supports some form of texture shader. (could be limited to DX6 EMBM for example)
+    virtual bool			supportTextureShaders() const
+    {
+        return true;
+    };
+    // Is the shader water supported ? If not, the driver caller should implement its own version
+    virtual bool			supportWaterShader() const
+    {
+        return true;
+    };
+    /// Does the cubemap face convention use +Z as forward? (D3D: true, GL: false)
+    /// GL cubemaps map forward (-Z) to NEGATIVE_Z face, D3D maps forward (+Z) to POSITIVE_Z face.
+    virtual bool			cubemapZPositiveForward() const
+    {
+        return true;
+    };
+    //
+    /// test whether a texture addressing mode is supported
+    virtual bool			supportTextureAddrMode(NL3D::CMaterial::TTexAddressingMode mode) const
+    {
+        return true;
+    };
+    /** setup the 2D matrix for the OffsetTexture, OffsetTextureScale and OffsetTexture addressing mode
+      * It should be stored as the following
+      * [a0 a1]
+      * [a2 a3]
+      */
+    virtual void			setMatrix2DForTextureOffsetAddrMode(const uint stage, const float mat[4])
+    {
+        
+    };
+    //@}
+
+
+
+    /** \name EMBM support. If texture shaders are present, this is not available, must use them instead.
+      * EMBM is a color op of CMaterial.
+      * NB : EMBM is the equivalent of the CMaterial::OffsetTexture addressing mode. However, it is both a texture
+      * addressing mode and a color op.
+      * NB : EMBM may not be supported by all stages.
+      *
+      * if embm unit is at last last stage, it operates on texture at first stage
+      * otherwise it operates on texture at next stage
+      */
+
+      // @{
+      // Test if EMBM is supported.
+    virtual bool			supportEMBM() const
+    {
+        return true;
+    };
+    // Test if EMBM is supported for the given stage
+    virtual bool			isEMBMSupportedAtStage(uint stage) const
+    {
+        return true;
+    };
+    // set the matrix used for EMBM addressing
+    virtual void			setEMBMMatrix(const uint stage, const float mat[4])
+    {
+        
+    };
+    // @}
+
+
+
+    /// \name Misc
+    // @{
+    /**	Does the driver support Blend Constant Color ??? If yes CMaterial::blendConstant* enum can be used
+     *	for blend Src ord Dst factor. If no, using these enum will have undefined results.
+     */
+    virtual	bool			supportBlendConstantColor() const
+    {
+        return true;
+    };
+
+    /**	see supportBlendConstantColor(). Set the current Blend Constant Color.
+     */
+    virtual	void			setBlendConstantColor(NLMISC::CRGBA col)
+    {
+    };
+
+    /**	see supportBlendConstantColor(). Get the current Blend Constant Color.
+     */
+    virtual	NLMISC::CRGBA	getBlendConstantColor() const
+    {
+        return NLMISC::CRGBA::Yellow;
+    };
+
+    /** force the driver to flush all command. glFinish() in opengl.
+     *	Interesting only for debug and profiling purpose.
+     */
+    virtual	void			finish()
+    {
+        return;
+    };
+
+    // Flush command queue an immediately returns
+    virtual void            flush()
+    {
+        return;
+    };
+
+    /** Use AntiAliasing For polygons (GL_POLYGON_SMOOTH like, not the FSAA).
+     *	See GL_POLYGON_SMOOTH help, and GL_SRC_ALPHA_SATURATE OpenGL doc (not yet implemented now since
+     *	used only for alpha part in ShadowMap gen)
+     */
+    virtual	void			enablePolygonSmoothing(bool smooth)
+    {
+
+    };
+
+    /// see enablePolygonSmoothing()
+    virtual	bool			isPolygonSmoothingEnabled() const
+    {
+        return true;
+    };
+    // @}
+
+
+
+    /**	Special method to internally swap the Driver handle of 2 textures.
+     *	USE IT WITH CARE (eg: may have Size problems, mipmap problems, format problems ...)
+     *	Actually, it is used only by CAsyncTextureManager, to manage Lods of DXTC CTextureFile.
+     *	NB: internally, all textures slots are disabled.
+     */
+    virtual void			swapTextureHandle(NL3D::ITexture& tex0, NL3D::ITexture& tex1)
+    {
+        
+    };
+
+    /** Advanced usage. Get the texture Handle.Useful for texture sorting for instance
+     *	NB: if the texture is not setuped in the driver, 0 is returned.
+     *	NB: if implementation does not support it, 0 may be returned. OpenGL ones return the Texture ID.
+     *	NB: unlike isTextureExist(), this method is not thread safe.
+     */
+    virtual	uintptr_t		getTextureHandle(const NL3D::ITexture& tex)
+    {
+        return 0;
+    };
+
+    // see if the Multiply-Add Tex Env operator is supported (see CMaterial::Mad)
+    virtual	bool			supportMADOperator() const
+    {
+        return true;
+    };
+
+    /// Return true if the driver supports large UBO arrays (e.g. skeleton bones, light tables).
+    /// Returns false on ANGLE/D3D11 where the GLSL-to-HLSL translator fails on large arrays.
+    virtual bool			supportLargeUBOArrays() const
+    {
+        return true;
+    }
+
+    // Get the number of hardware renderer available on the client platform.
+    virtual uint			getNumAdapter() const
+    {
+        return 1;
+    };
+
+    // Get a hardware renderer description.
+    virtual bool			getAdapter(uint adapter, CAdapter& desc) const
+    {
+        return true;
+    };
+
+    /** Choose the hardware renderer.
+     *  Call it before the setDisplay and enumModes methods
+     *	Choose adapter = 0xffffffff for the default one.
+     */
+    virtual bool			setAdapter(uint adapter)
+    {
+        return true;
+    };
+
+    /** Tell if the vertex color memory format is RGBA (openGL) or BGRA (directx)
+      * BGRA :
+      *			*****************************************************************
+      *	Offset:	*    0          *      1        *     2         *     3         *
+      *			*****************************************************************
+      *	RGBA	*    red        *      green    *     blue      *     alpha     *
+      *			*****************************************************************
+      *	BGRA	*    blue       *      green    *     red       *     alpha     *
+      *			*****************************************************************
+      */
+    virtual NL3D::CVertexBuffer::TVertexColorType getVertexColorFormat() const
+    {
+        return NL3D::CVertexBuffer::TVertexColorType::TRGBA;
+    };
+
+
+
+    /// \name Bench
+    // @{
+    // Start the bench. See CHTimer::startBench();
+    virtual void			startBench(bool wantStandardDeviation = false, bool quick = false, bool reset = true)
+    {
+        return;
+    }
+
+    // End the bench. See CHTimer::endBench();
+    virtual void			endBench()
+    {
+        return;
+    };
+
+    // Display the bench result
+    virtual void			displayBench(class NLMISC::CLog* log)
+    {
+        
+    };
+    // @}
+
+
+
+    /// \name Occlusion query mechanism
+    // @{
+    // Test whether this device supports the occlusion query mechanism
+    virtual bool			supportOcclusionQuery() const
+    {
+        return true;
+    };
+    /** Create an occlusion query object.
+      * \return NULL is not enough resources or if not supported
+      */
+    virtual NL3D::IOcclusionQuery* createOcclusionQuery()
+    {
+        return nullptr;
+    };
+    // Delete an occlusion query object previously obtained by a call to createOcclusionQuery
+    virtual void			deleteOcclusionQuery(NL3D::IOcclusionQuery* oq)
+    {
+        return;
+    };
+    // @}
+
+
+
+
+    /** Set cull mode
+      * Useful for mirrors / cube map rendering or when the scene must be rendered upside down
+      */
+    virtual void			setCullMode(TCullMode cullMode)
+    {
+        return;
+    };
+    virtual	TCullMode       getCullMode() const
+    {
+        return TCullMode::CCW;
+    };
+
+    /** Set stencil support
+      */
+    virtual void			enableStencilTest(bool enable)
+    {
+
+    };
+    virtual bool			isStencilTestEnabled() const
+    {
+        return true;
+    };
+    virtual void			stencilFunc(TStencilFunc stencilFunc, int ref, uint mask)
+    {
+
+    };
+    virtual void			stencilOp(TStencilOp fail, TStencilOp zfail, TStencilOp zpass)
+    {
+
+    };
+    virtual void			stencilMask(uint mask)
+    {
+
+    };
+
+    /** Set clip planes. Plane is in NeL world space.
+      * The driver handles coordinate system conversion internally.
+      * Useful for water reflections to clip geometry below the water surface.
+      */
+    virtual void			enableClipPlane(uint index, bool enable)
+    {
+
+    };
+    virtual void			setClipPlane(uint index, const NLMISC::CPlane& plane)
+    {
+        
+    };
+};

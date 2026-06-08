@@ -20,17 +20,15 @@ struct VS_OUTPUT
     float2 ftile2_uv : TEXCOORD3;
 };
 
-cbuffer CameraInfo : register(b0) 
+cbuffer CameraInfo : register(b0, space1) 
 {
     float4x4 view;
     float4x4 proj;
 };
-cbuffer Model : register(b1)
+cbuffer Model : register(b1, space1)
 {
     float4x4 model;
 };
-
-static const uint EMPTY_TILE = 255; // Matches NL_TILE_ELM_LAYER_EMPTY
 
 VS_OUTPUT main(VS_INPUT input)
 {
@@ -42,8 +40,6 @@ VS_OUTPUT main(VS_INPUT input)
     output.ftile1_uv = input.vtile1_uv;
     output.ftile2_uv = input.vtile2_uv;
 
-    float4x4 vpm = mul(proj, view);
-    vpm = mul(vpm, model);
-    output.oPosition = mul(vpm, float4(input.vPosition, 1.0));
+    output.oPosition = mul(proj, mul(view, mul(model, float4(input.vPosition, 1.0))));
     return output;
 }

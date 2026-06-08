@@ -34,5 +34,5 @@ public:
     Renderer(SDL_GPUDevice* device, SDL_Window* window);
     void Init();
     void AddRenderable(IRenderable* renderable);
-    void Render();
+    void Render(SDL_GPUCommandBuffer* cmd, SDL_GPURenderPass* renderPass);
 };

@@ -19,6 +19,8 @@
 // Main code
 int main(int, char**)
 {
+    new NLMISC::CApplicationContext;
+
     // Setup SDL
     // [If using SDL_MAIN_USE_CALLBACKS: all code below until
     // the main loop starts would likely be your SDL_AppInit() function]
@@ -119,16 +121,24 @@ int main(int, char**)
     //ImFont* font = io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\ArialUni.ttf");
     //IM_ASSERT(font != nullptr);
 
-    ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+    int windowWidth;
+    int windowHeight;
+    SDL_GetWindowSize(window, &windowWidth, &windowHeight);
 
-    NLMISC::CApplicationContext myApplicationContext;
-    //NLLIGO::Register();
-    /*NLLIGO::CLigoConfig LigoConfig;
-    NLLIGO::CPrimitiveContext::instance().CurrentLigoConfig = &LigoConfig;
-    NLLIGO::CPrimitives primDoc;
-    NLLIGO::CPrimitiveContext::instance().CurrentPrimitive = &primDoc;
-    */
+    SDL_GPUTextureCreateInfo depthTextureCreateInfo = SDL_GPUTextureCreateInfo();
+    depthTextureCreateInfo.type = SDL_GPU_TEXTURETYPE_2D;
+    depthTextureCreateInfo.format = SDL_GPU_TEXTUREFORMAT_D32_FLOAT;
+    depthTextureCreateInfo.usage = SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET;
+    depthTextureCreateInfo.width = static_cast<uint32_t>(windowWidth);
+    depthTextureCreateInfo.height = static_cast<uint32_t>(windowHeight);
+    depthTextureCreateInfo.layer_count_or_depth = 1;
+    depthTextureCreateInfo.num_levels = 1;
+    depthTextureCreateInfo.sample_count = SDL_GPU_SAMPLECOUNT_4; // Must match c
+    SDL_GPUTexture* depthTexture = SDL_CreateGPUTexture(gpu_device, &depthTextureCreateInfo);
+
+    ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
     bool done = false;
+
     LandscapeManager* landscapeManager = new LandscapeManager(
         gpu_device, "world_editor_classes.xml");
     landscapeManager->LoadShaders(window);
@@ -184,8 +194,6 @@ int main(int, char**)
         ImGui_ImplSDL3_NewFrame();
         ImGui::NewFrame();
 
-        renderer->Render();
-
         ryzUI->Render();
 
         // Rendering
@@ -218,8 +226,17 @@ int main(int, char**)
             target_info.mip_level = 0;
             target_info.layer_or_depth_plane = 0;
             target_info.cycle = false;
+
+            SDL_GPUDepthStencilTargetInfo depthTargetInfo = { 0 };
+            depthTargetInfo.texture = depthTexture;
+            depthTargetInfo.clear_depth = 1.0f;
+            depthTargetInfo.load_op = SDL_GPU_LOADOP_CLEAR;
+            depthTargetInfo.store_op = SDL_GPU_STOREOP_STORE;
+
             SDL_GPURenderPass* render_pass =
-                SDL_BeginGPURenderPass(command_buffer, &target_info, 1, nullptr);
+                SDL_BeginGPURenderPass(command_buffer, &target_info, 1, &depthTargetInfo);
+
+            renderer->Render(command_buffer, render_pass);
 
             // Render ImGui
             ImGui_ImplSDLGPU3_RenderDrawData(draw_data, command_buffer, render_pass);

@@ -11,7 +11,7 @@ void Image::Prepare(SDL_GPUDevice* device)
     this->num_levels = std::max(1u, static_cast<Uint32>(
         std::floor(std::log2(std::min(width, height)))));
 
-    SDL_GPUTextureCreateInfo textureDesc;
+    SDL_GPUTextureCreateInfo textureDesc = SDL_GPUTextureCreateInfo();
 	textureDesc.type = SDL_GPU_TEXTURETYPE_2D;
 	textureDesc.usage = SDL_GPU_TEXTUREUSAGE_SAMPLER | SDL_GPU_TEXTUREUSAGE_COLOR_TARGET;
 	textureDesc.width = static_cast<Uint32>(width);
@@ -41,6 +41,8 @@ void Image::Prepare(SDL_GPUDevice* device)
     }
     this->texture =
         SDL_CreateGPUTexture(device, &textureDesc);
+
+    this->pixels.resize(width * height);
 }
 
 void Image::Stage(SDL_GPUDevice* device, SDL_GPUTransferBuffer* transferBuffer, Uint32 offset)
