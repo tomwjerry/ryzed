@@ -12,12 +12,13 @@ void Image::Prepare(SDL_GPUDevice* device)
         std::floor(std::log2(std::min(width, height)))));
 
     SDL_GPUTextureCreateInfo textureDesc = SDL_GPUTextureCreateInfo();
-	textureDesc.type = SDL_GPU_TEXTURETYPE_2D;
+	textureDesc.type = this->type;
 	textureDesc.usage = SDL_GPU_TEXTUREUSAGE_SAMPLER | SDL_GPU_TEXTUREUSAGE_COLOR_TARGET;
 	textureDesc.width = static_cast<Uint32>(width);
 	textureDesc.height = static_cast<Uint32>(height);
-	textureDesc.layer_count_or_depth = 1;
-	textureDesc.num_levels = num_levels;
+	textureDesc.layer_count_or_depth = this->layers;
+	textureDesc.num_levels = this->num_levels;
+    s
     if (this->component == 1)
     {
         textureDesc.format = SDL_GPU_TEXTUREFORMAT_R8_UNORM;

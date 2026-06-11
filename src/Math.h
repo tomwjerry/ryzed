@@ -60,6 +60,7 @@ public:
     static float Radians(float degrees);
     static Mat4 LookAt(Vector3 eye, Vector3 center, Vector3 up);
     static Mat4 Perspective(float fov, float aspect, float near, float far);
+    static Mat4 Translate(Vector3 v, Mat4 m);
     static Vector3 Rotate(Vector3 v, float radians, Vector3 axis);
     static Vector3 Cross(Vector3 a, Vector3 b);
     static Vector3 Normalize(Vector3 v);

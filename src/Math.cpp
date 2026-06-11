@@ -54,8 +54,8 @@ Mat4 Math::Perspective(float fov, float aspect, float near, float far)
     
     result.m8 = 0.0f;
     result.m9 = 0.0f;
-    result.m10 = (far + near) * nf;
-    result.m11 = (2.0f * far * near) * nf;
+    result.m10 = far * near;
+    result.m11 = (near * far) / (near - far);
     
     result.m12 = 0.0f;
     result.m13 = 0.0f;
@@ -99,4 +99,12 @@ Vector3 Math::Normalize(Vector3 v)
 float Math::Normalize(Vector3 a, Vector3 b)
 {
     return std::sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y) + (a.z - b.z) * (a.z - b.z));
+}
+
+Mat4 Math::Translate(Vector3 v, Mat4 m)
+{
+    m.m12 = v.x;
+    m.m13 = v.y;
+    m.m14 = v.z;
+    return m;
 }

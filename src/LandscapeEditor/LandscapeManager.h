@@ -45,17 +45,21 @@ private:
     std::string tileBankFilePath;
 
     NL3D::CTileBank* tileBank;
-    //NL3D::CLandscapeModel* landscapeModel;
     NL3D::CLandscape* landscape;
 
     bool ready = false;
+
     std::vector<VertexData> vertices;
     std::vector<int> indexes;
     SDL_GPUBuffer* vertexBuffer;
     SDL_GPUBuffer* indexBuffer;
+    
+    SDL_GPUGraphicsPipeline* landscapePipeline;
+
+    std::vector<float[3]> tileBitmaps;
+    Image* tileImages;
     Image* tileIdMaps[3];
     SDL_GPUSampler* samplers[3];
-    SDL_GPUGraphicsPipeline* landscapePipeline;
 
     void parsePath(std::string& path);
 

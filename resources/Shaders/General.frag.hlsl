@@ -19,30 +19,33 @@ static const uint EMPTY_TILE = 4095; // Matches NL_TILE_ELM_LAYER_EMPTY
 
 float4 main(PS_INPUT input) : SV_TARGET
 {
-    float3 uv0 = float3(input.ftile0_uv, float(input.fTileIndexes.x));
+    float3 uv0 = float3(input.ftile0_uv.xy, 1.0f);
+    //float3 uv0 = float3(input.ftile0_uv, float(input.fTileIndexes.x));
     float4 finalColor = tile0.Sample(tileSampler0, uv0.xy);
     
     // --- LAYER 1 ---
     if (input.fTileIndexes.y != EMPTY_TILE) 
     {
-        float3 uv1 = float3(input.ftile1_uv, float(input.fTileIndexes.y));
+        float3 uv1 = float3(input.ftile1_uv.xy, 1.0f);
+        //float3 uv1 = float3(input.ftile1_uv, float(input.fTileIndexes.y));
         float4 color1 = tile1.Sample(tileSampler1, uv1.xy);
         // lerp maps seamlessly to GLSL's 'mix' function
-        finalColor = lerp(finalColor, color1, color1.a);
+        //finalColor = lerp(finalColor, color1, color1.a);
     }
     
     // --- LAYER 2 ---
     if (input.fTileIndexes.z != EMPTY_TILE) 
     {
-        float3 uv2 = float3(input.ftile2_uv, float(input.fTileIndexes.z));
+        float3 uv2 = float3(input.ftile2_uv.xy, 1.0f);
+        //float3 uv2 = float3(input.ftile2_uv, float(input.fTileIndexes.z));
         float4 color2 = tile2.Sample(tileSampler2, uv2.xy);
-        finalColor = lerp(finalColor, color2, color2.a);
+        //finalColor = lerp(finalColor, color2, color2.a);
     }
     
     // --- LIGHTING ---
     // Simple global directional light direction
     float3 lightDir = normalize(float3(0.5f, 1.0f, 0.3f));
-    float ndotl = max(dot(normalize(input.fNormal), lightDir), 0.2f); // 0.2f ambient floor
+    float ndotl = max(dot(normalize(input.fNormal), lightDir), 0.6f); // 0.2f ambient floor
     
     return float4(finalColor.rgb * ndotl, 1.0f);
 }

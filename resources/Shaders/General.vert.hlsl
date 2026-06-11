@@ -11,7 +11,7 @@ struct VS_INPUT
 
 struct VS_OUTPUT
 {
-    float4 oPosition : SV_POSITION;
+    float4 oPosition : SV_Position;
     float3 fNormal : NORMAL;
     float2 fTexUV : TEXCOORD0;
     int3 fTileIndexes : TILEINDEXES;

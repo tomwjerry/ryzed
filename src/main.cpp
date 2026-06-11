@@ -133,7 +133,7 @@ int main(int, char**)
     depthTextureCreateInfo.height = static_cast<uint32_t>(windowHeight);
     depthTextureCreateInfo.layer_count_or_depth = 1;
     depthTextureCreateInfo.num_levels = 1;
-    depthTextureCreateInfo.sample_count = SDL_GPU_SAMPLECOUNT_4; // Must match c
+    depthTextureCreateInfo.sample_count = SDL_GPU_SAMPLECOUNT_1; // Must match c
     SDL_GPUTexture* depthTexture = SDL_CreateGPUTexture(gpu_device, &depthTextureCreateInfo);
 
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
