@@ -11,6 +11,7 @@
 
 #include <SDL3/SDL.h>
 
+#include <array>
 #include <map>
 #include <vector>
 
@@ -22,7 +23,7 @@ struct VertexData
 {
     NLMISC::CVector position;
     NLMISC::CVector normal;
-    NLMISC::CUV mainUV;
+    float mainUV[3];
     uint32 tileIndexes[3];
     NLMISC::CUV tileUV0;
     NLMISC::CUV tileUV1;
@@ -56,10 +57,10 @@ private:
     
     SDL_GPUGraphicsPipeline* landscapePipeline;
 
-    std::vector<float[3]> tileBitmaps;
+    std::vector<std::array<float, 3>> tileBitmaps;
     Image* tileImages;
     Image* tileIdMaps[3];
-    SDL_GPUSampler* samplers[3];
+    SDL_GPUSampler* samplers[4];
 
     void parsePath(std::string& path);
 

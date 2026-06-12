@@ -1,6 +1,7 @@
 #include "Image.h"
 #include <SDL3/SDL.h>
 #include <cmath>
+#include <algorithm>
 
 /*
  * MIT License, Based on code with Copyright (c) 2025 Loïc Chen
@@ -18,7 +19,7 @@ void Image::Prepare(SDL_GPUDevice* device)
 	textureDesc.height = static_cast<Uint32>(height);
 	textureDesc.layer_count_or_depth = this->layers;
 	textureDesc.num_levels = this->num_levels;
-    s
+    
     if (this->component == 1)
     {
         textureDesc.format = SDL_GPU_TEXTUREFORMAT_R8_UNORM;
@@ -46,29 +47,46 @@ void Image::Prepare(SDL_GPUDevice* device)
     this->pixels.resize(width * height);
 }
 
-void Image::Stage(SDL_GPUDevice* device, SDL_GPUTransferBuffer* transferBuffer, Uint32 offset)
+void Image::Stage(SDL_GPUDevice* device, SDL_GPUTransferBuffer* transferBuffer,
+    Uint32 offset, Uint32 limit)
 {
     void* transferData = SDL_MapGPUTransferBuffer(device, transferBuffer, false);
-    memcpy(reinterpret_cast<Uint8*>(transferData) + offset, this->pixels.data(), this->pixels.size());
+    SDL_memcpy(reinterpret_cast<Uint8*>(transferData) + offset, this->pixels.data(),
+        this->pixels.size());
+    SDL_UnmapGPUTransferBuffer(device, transferBuffer);
+}
+
+void Image::StageLayer(SDL_GPUDevice* device, SDL_GPUTransferBuffer* transferBuffer,
+    Uint32 layer, Uint32 offset)
+{
+    void* transferData = SDL_MapGPUTransferBuffer(device, transferBuffer, false);
+    
+    // 1. Calculate the number of elements per layer
+    size_t elementsPerLayer = static_cast<size_t>(this->width) * this->height;
+    
+    // 3. Pointer math: Start of the layer in the vector
+    // pixels.data() returns Uint64*, so the offset should be in elements, not bytes
+    const Uint64* sourcePtr = this->pixels.data() + (layer * elementsPerLayer);
+    
+    // 4. Copy the data
+    SDL_memcpy(reinterpret_cast<Uint8*>(transferData) + offset, sourcePtr, elementsPerLayer);
+    
     SDL_UnmapGPUTransferBuffer(device, transferBuffer);
 }
 
 void Image::Upload(SDL_GPUDevice* device, SDL_GPUCopyPass* copyPass,
-    SDL_GPUTransferBuffer* transferBuffer, Uint32 offset)
+    SDL_GPUTransferBuffer* transferBuffer, Uint32 offset, Uint32 layer)
 {
     SDL_GPUTextureTransferInfo src = {
         transferBuffer,
         offset
     };
-    SDL_GPUTextureRegion dst = {
-        this->texture,
-        0,
-        0,
-        0,
-        static_cast<Uint32>(this->width),
-        static_cast<Uint32>(this->height),
-        1
-    };
+    SDL_GPUTextureRegion dst = SDL_GPUTextureRegion();
+    dst.texture = this->texture;
+    dst.h = static_cast<Uint32>(this->height);
+    dst.w = static_cast<Uint32>(this->width);
+    dst.layer = layer;
+    dst.d = 1;
     SDL_UploadToGPUTexture(copyPass, &src, &dst, false);
 }
 

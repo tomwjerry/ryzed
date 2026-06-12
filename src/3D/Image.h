@@ -26,9 +26,12 @@ public:
     Uint32 total_byte_count() { return pixels.size(); }
 
     void Prepare(SDL_GPUDevice* device);
-    void Stage(SDL_GPUDevice* device, SDL_GPUTransferBuffer* transferBuffer, Uint32 offset = 0);
+    void Stage(SDL_GPUDevice* device, SDL_GPUTransferBuffer* transferBuffer,
+        Uint32 offset = 0, Uint32 limit = UINT32_MAX);
+    void StageLayer(SDL_GPUDevice* device, SDL_GPUTransferBuffer* transferBuffer,
+        Uint32 layer, Uint32 offset = 0);
     void Upload(SDL_GPUDevice* device, SDL_GPUCopyPass* copyPass,
-        SDL_GPUTransferBuffer* transferBuffer, Uint32 offset = 0);
+        SDL_GPUTransferBuffer* transferBuffer, Uint32 offset = 0, Uint32 layer = 0);
     void Release(SDL_GPUDevice* device);
 
     void GenerateMipmaps(SDL_GPUCommandBuffer* cmd);

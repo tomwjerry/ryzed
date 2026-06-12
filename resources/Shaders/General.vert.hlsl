@@ -2,7 +2,7 @@ struct VS_INPUT
 {
     float3 vPosition : POSITION;
     float3 vNormal : NORMAL;
-    float2 vTexUV : TEXCOORD0;
+    float3 vTexUV : TEXCOORD0;
     int3 vTileIndexes : TILEINDEXES;
     float2 vtile0_uv : TEXCOORD1;
     float2 vtile1_uv : TEXCOORD2;
@@ -13,7 +13,7 @@ struct VS_OUTPUT
 {
     float4 oPosition : SV_Position;
     float3 fNormal : NORMAL;
-    float2 fTexUV : TEXCOORD0;
+    float3 fTexUV : TEXCOORD0;
     int3 fTileIndexes : TILEINDEXES;
     float2 ftile0_uv : TEXCOORD1;
     float2 ftile1_uv : TEXCOORD2;

@@ -312,7 +312,7 @@ bool LandscapeManager::PrepareRender()
 {
     SDL_GPUTransferBufferCreateInfo transferInfo;
     transferInfo.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
-    transferInfo.size = 256 * 256 * 4 * 3;
+    transferInfo.size = 256 * 256 * 3 * 4;
     SDL_GPUTransferBuffer* transferBuffer =
         SDL_CreateGPUTransferBuffer(this->device, &transferInfo);
 
@@ -333,6 +333,18 @@ bool LandscapeManager::PrepareRender()
     texTransferOffset = this->tileIdMaps[1]->total_byte_count();
     this->tileIdMaps[2]->Upload(this->device, copyPass, transferBuffer, texTransferOffset);
 
+    transferInfo.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
+    transferInfo.size = this->tileImages->layers * 4096 * 4096 * 4;
+    SDL_GPUTransferBuffer* arrTransfer =
+        SDL_CreateGPUTransferBuffer(this->device, &transferInfo);
+
+    for (int i = 0; i < this->tileImages->layers; i++)
+    {
+        int offset = i * 4096 * 4096 * 4;
+        this->tileImages->StageLayer(this->device, arrTransfer, i, offset);
+        this->tileImages->Upload(this->device, copyPass, arrTransfer, offset, i);
+    }
+
     SDL_EndGPUCopyPass(copyPass);
     SDL_SubmitGPUCommandBuffer(cmd);
 
@@ -346,18 +358,20 @@ bool LandscapeManager::PrepareRender()
         SDL_GPU_BUFFERUSAGE_INDEX, this->indexBuffer);
 
     SDL_GPUSamplerCreateInfo samplerCreateInfo = SDL_GPUSamplerCreateInfo();
-    samplerCreateInfo.min_filter = SDL_GPU_FILTER_LINEAR;
-    samplerCreateInfo.mag_filter = SDL_GPU_FILTER_LINEAR;
-    samplerCreateInfo.mipmap_mode = SDL_GPU_SAMPLERMIPMAPMODE_LINEAR;
-    samplerCreateInfo.address_mode_u = SDL_GPU_SAMPLERADDRESSMODE_MIRRORED_REPEAT;
-    samplerCreateInfo.address_mode_v = SDL_GPU_SAMPLERADDRESSMODE_MIRRORED_REPEAT;
-    samplerCreateInfo.max_anisotropy = 4;
-    samplerCreateInfo.min_lod = 0.0f;
-    samplerCreateInfo.max_lod = 200.0f;
-    samplerCreateInfo.enable_anisotropy = true;
+    samplerCreateInfo.min_filter = SDL_GPU_FILTER_NEAREST;
+    samplerCreateInfo.mag_filter = SDL_GPU_FILTER_NEAREST;
+    samplerCreateInfo.mipmap_mode = SDL_GPU_SAMPLERMIPMAPMODE_NEAREST;
+    samplerCreateInfo.address_mode_u = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
+    samplerCreateInfo.address_mode_v = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
+    samplerCreateInfo.address_mode_w = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
+    //samplerCreateInfo.max_anisotropy = 4;
+    //samplerCreateInfo.min_lod = 0.0f;
+    //samplerCreateInfo.max_lod = 200.0f;
+    //samplerCreateInfo.enable_anisotropy = true;
     this->samplers[0] = SDL_CreateGPUSampler(this->device, &samplerCreateInfo);
     this->samplers[1] = SDL_CreateGPUSampler(this->device, &samplerCreateInfo);
     this->samplers[2] = SDL_CreateGPUSampler(this->device, &samplerCreateInfo);
+    this->samplers[3] = SDL_CreateGPUSampler(this->device, &samplerCreateInfo);
 
     this->ready = true;
     
@@ -397,7 +411,7 @@ bool LandscapeManager::Render(SDL_GPURenderPass* renderPass,
     vertexBufferBindings[0].offset = 0;
     SDL_BindGPUVertexBuffers(renderPass, 0, vertexBufferBindings, 1); // Vertex buffer size!
     
-    SDL_GPUTextureSamplerBinding textureSamplerBindings[3];
+    SDL_GPUTextureSamplerBinding textureSamplerBindings[4];
     textureSamplerBindings[0] = SDL_GPUTextureSamplerBinding();
     textureSamplerBindings[0].texture = this->tileIdMaps[0]->texture;
     textureSamplerBindings[0].sampler = this->samplers[0];
@@ -407,13 +421,15 @@ bool LandscapeManager::Render(SDL_GPURenderPass* renderPass,
     textureSamplerBindings[2] = SDL_GPUTextureSamplerBinding();
     textureSamplerBindings[2].texture = this->tileIdMaps[2]->texture;
     textureSamplerBindings[2].sampler = this->samplers[2];
-    SDL_BindGPUFragmentSamplers(renderPass, 0, textureSamplerBindings, 3);
+    textureSamplerBindings[3].texture = this->tileImages->texture;
+    textureSamplerBindings[3].sampler = this->samplers[3];
 
     SDL_GPUBufferBinding indexBufferBinding = SDL_GPUBufferBinding();
     indexBufferBinding.buffer = this->indexBuffer;
     indexBufferBinding.offset = 0;
     SDL_BindGPUIndexBuffer(renderPass, &indexBufferBinding,
         SDL_GPU_INDEXELEMENTSIZE_32BIT);
+    SDL_BindGPUFragmentSamplers(renderPass, 0, textureSamplerBindings, 4);
     SDL_DrawGPUIndexedPrimitives(renderPass, this->indexes.size(), 1, 0, 0, 0);
 
     return true;
@@ -506,7 +522,7 @@ void LandscapeManager::loadTileBank(const std::string& bankFilePath)
         // Store unique filename
         std::unordered_set<std::string> tileFiles;
         // Tileid to filename set pos
-        std::vector<std::unordered_set<std::string>::iterator> tileplaces;
+        std::vector<std::string> tileplaces;
 
         sint tilecount = this->tileBank->getTileCount();
         // First get our filenames, make sure we only have unique filenames
@@ -516,16 +532,18 @@ void LandscapeManager::loadTileBank(const std::string& bankFilePath)
             std::string tfs = this->tileBank->getTile(i)->getRelativeFileName(NL3D::CTile::diffuse);
             auto k = tileFiles.insert(tfs);
             // Map tileid to the place string is stored
-            tileplaces.push_back(k.first);
+            tileplaces.push_back(tfs);
         }
 
         // Filename to either bm128 (false) or bm256 (true)
-        std::map<std::unordered_set<std::string>::iterator, std::pair<bool, int>> fnlookup;
+        std::map<std::string, std::pair<bool, int>> fnlookup;
         // Two arrays so we can sort
         std::vector<NL3D::CBitmap> bm128;
         std::vector<NL3D::CBitmap> bm256;
         // Dummy for anything not found
         bm128.push_back(NL3D::CBitmap());
+        bm128[0].makeDummy();
+        bm128[0].resample(128, 128);
 
         // Open file, get the bitmaps out
         // Sort bitmaps whatever they are 128 or 256
@@ -543,17 +561,18 @@ void LandscapeManager::loadTileBank(const std::string& bankFilePath)
             {
                 bm256.push_back(tbbm);
                 // We will use the lookup for the tileplaces later
-                fnlookup.emplace(tfiter, { true, bm256.size() - 1 });
+                fnlookup.insert({ *tfiter, { true, static_cast<int>(bm256.size() - 1) } });
             }
             else if (h == 128)
             {
                 bm128.push_back(tbbm);
                 // Same, for tileplaces
-                fnlookup.emplace(tfiter, { false, bm128.size() - 1 });
+                fnlookup.emplace(*tfiter,
+                    std::pair<bool, int>(false, static_cast<int>(bm128.size() - 1)));
             }
             else
             {
-                fnlookup.emplace(tfiter, { false, 0 });
+                fnlookup.emplace(*tfiter, std::pair<bool, int>(false, 0));
             }
         }
 
@@ -574,20 +593,23 @@ void LandscapeManager::loadTileBank(const std::string& bankFilePath)
 
         // Number of 128s we can put in a 4096 is 31 * 31 = 961
         // 31 = 4096 / 128 + 1
-        int times128 = ceil((bm128.size() * 961) / 4096);
+        // TODO: If we does not have any 128 or 256, lenght should be 0
+        int times128 = std::max(static_cast<int>(ceil(bm128.size() / 961)), 1);
         // 15 = 4096 / 256 + 1, 15 * 15 = 225
-        int times256 = ceil((bm256.size() * 225) / 4096);
+        int times256 = std::max(static_cast<int>(ceil(bm256.size() / 225)), 1);
         
         this->tileImages = new Image();
-        this->tileImages->usage = SDL_GPU_TEXTURETYPE_2D_ARRAY;
+        this->tileImages->type = SDL_GPU_TEXTURETYPE_2D_ARRAY;
         this->tileImages->width = 4096;
         this->tileImages->height = this->tileImages->width;
         this->tileImages->component = 4;
         this->tileImages->layers = (times128 + times256);
         this->tileImages->Prepare(this->device);
+        this->tileImages->pixels.resize(
+            this->tileImages->width * this->tileImages->height * this->tileImages->layers);
 
-        std::vector<float[3]> uv128lookup;
-        std::vector<float[3]> uv256lookup;
+        std::vector<std::array<float, 3>> uv128lookup;
+        std::vector<std::array<float, 3>> uv256lookup;
 
         int h = 128;
         int layer = 0;
@@ -602,14 +624,16 @@ void LandscapeManager::loadTileBank(const std::string& bankFilePath)
             int baseAtlasY = offsety * 130 + 1;
             int layerOffset = layer * 4096 * 4096;
 
-            uv128lookup.push_back({ baseAtlasX / 4096.0f, baseAtlasY / 4096.0f, layer });
+            uv128lookup.push_back({ baseAtlasX / 4096.0f, baseAtlasY / 4096.0f,
+                static_cast<float>(layer) });
 
-            for (int x = 0; x < h; x++)
+            for (int y = 0; y < h; y++)
             {
-                for (int y = 0; y < h; y++)
+                int atlasRowIndex = (baseAtlasY + y) * 4096;
+                for (int x = 0; x < h; x++)
                 {
                     int srcIdx = (y * h + x) * 4;
-                    int destIdx = layerOffset + ((baseAtlasY + y) * 4096) + (baseAtlasX + x);
+                    int destIdx = layerOffset + atlasRowIndex + (baseAtlasX + x);
                     
                     this->tileImages->pixels[destIdx] =
                         (pixels[srcIdx + 3] << 24) |
@@ -649,7 +673,8 @@ void LandscapeManager::loadTileBank(const std::string& bankFilePath)
             int baseAtlasY = offsety * 258 + 1;
             int layerOffset = layer * 4096 * 4096;
 
-            uv256lookup.push_back({ baseAtlasX / 4096.0f, baseAtlasY / 4096.0f, layer });
+            uv256lookup.push_back({ baseAtlasX / 4096.0f, baseAtlasY / 4096.0f,
+                static_cast<float>(layer) });
 
             for (int x = 0; x < h; x++)
             {
@@ -860,20 +885,34 @@ void LandscapeManager::buildFaces(sint zoneId, sint patch)
     {
         for (x = 0; x < ordS; x++)
         {
-            auto tileIndex = this->getPatchTileIndex(*pa, x, y);
+            uint8 tileIndex = this->getPatchTileIndex(*pa, x, y);
             const auto& tile = tiles[tileIndex];
             if (tile.Tile[0] == NL_TILE_ELM_LAYER_EMPTY)
             {
                 nlwarning("tile base layer not defined patch %d x %d y %d tileIndex %d",
                     patch, x, y, tileIndex);
             }
-            uint16 imageX = offset_x + x;
-            uint16 imageY = offset_y + y;
-            NLMISC::CUV tileInfo(imageX, imageY);
-            NL3D::CVector uvScaleBias;
+            float imageX = offset_x + x;
+            float imageY = offset_y + y;
             bool is256;
             uint8 uvOff;
             tile.getTile256Info(is256, uvOff);
+
+            auto& element = this->tileBitmaps.at(tile.Tile[0]);
+            float tileTextureInfo[3] = {
+                element.at(0),
+                element.at(1),
+                element.at(2)
+            };
+            float uvScale = 0;
+            if (is256)
+            {
+                uvScale = 256.0f / 4096.0f;
+            }
+            else
+            {
+                uvScale = 128.0f / 4096.0f;
+            }
         
             uint32_t vertexOffset = this->vertices.size();
             this->indexes.push_back(vertexOffset + 0);
@@ -886,7 +925,9 @@ void LandscapeManager::buildFaces(sint zoneId, sint patch)
             VertexData vd = VertexData();
             vd.position = NL3D::CVector(pa->computeContinousVertex(x * OOS, y * OOT));
             vd.normal = NL3D::CVector(bezierPatch.evalNormal(x * OOS, y * OOT));
-            vd.mainUV = NLMISC::CUV(tileInfo.U, tileInfo.V);
+            vd.mainUV[0] = tileTextureInfo[0] + imageX * uvScale;
+            vd.mainUV[1] = tileTextureInfo[1] + imageY * uvScale;
+            vd.mainUV[2] = tileTextureInfo[2];
             vd.tileIndexes[0] = tile.Tile[0];
             vd.tileIndexes[1] = tile.Tile[1];
             vd.tileIndexes[2] = tile.Tile[2];
@@ -897,7 +938,7 @@ void LandscapeManager::buildFaces(sint zoneId, sint patch)
 
             vd.position = NL3D::CVector(pa->computeContinousVertex(x * OOS, (y + 1) * OOT));
             vd.normal = NL3D::CVector(bezierPatch.evalNormal(x * OOS, (y + 1) * OOT));
-            vd.mainUV = NLMISC::CUV(tileInfo.U, tileInfo.V + pixelOffset);
+            vd.mainUV[1] = tileTextureInfo[1] + (imageY + pixelOffset) * uvScale;
             vd.tileUV0 = this->tileUV(B, tile.getTileOrient(0), is256, uvOff);
             vd.tileUV1 = this->tileUV(B, tile.getTileOrient(1), is256, uvOff);
             vd.tileUV2 = this->tileUV(B, tile.getTileOrient(2), is256, uvOff);
@@ -905,7 +946,7 @@ void LandscapeManager::buildFaces(sint zoneId, sint patch)
 
             vd.position = NL3D::CVector(pa->computeContinousVertex((x + 1) * OOS, (y + 1) * OOT));
             vd.normal = NL3D::CVector(bezierPatch.evalNormal((x + 1) * OOS, (y + 1) * OOT));
-            vd.mainUV = NLMISC::CUV(tileInfo.U + pixelOffset, tileInfo.V + pixelOffset);
+            vd.mainUV[0] = tileTextureInfo[0] + (imageX + pixelOffset) * uvScale;
             vd.tileUV0 = this->tileUV(C, tile.getTileOrient(0), is256, uvOff);
             vd.tileUV1 = this->tileUV(C, tile.getTileOrient(1), is256, uvOff);
             vd.tileUV2 = this->tileUV(C, tile.getTileOrient(2), is256, uvOff);
@@ -913,7 +954,7 @@ void LandscapeManager::buildFaces(sint zoneId, sint patch)
 
             vd.position = NL3D::CVector(pa->computeContinousVertex((x + 1) * OOS, y * OOT));
             vd.normal = NL3D::CVector(bezierPatch.evalNormal((x + 1) * OOS, y * OOT));
-            vd.mainUV = NLMISC::CUV(tileInfo.U + pixelOffset, tileInfo.V);
+            vd.mainUV[1] = tileTextureInfo[1] + imageY * uvScale;
             vd.tileUV0 = this->tileUV(D, tile.getTileOrient(0), is256, uvOff);
             vd.tileUV1 = this->tileUV(D, tile.getTileOrient(1), is256, uvOff);
             vd.tileUV2 = this->tileUV(D, tile.getTileOrient(2), is256, uvOff);
