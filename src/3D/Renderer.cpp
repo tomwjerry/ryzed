@@ -17,13 +17,13 @@ void Renderer::Init()
     int windowHeight;
     SDL_GetWindowSize(this->window, &windowWidth, &windowHeight);
 
-    this->camera = new Camera(Vector3(0.0f, 0.5f, -5.0f),
+    this->camera = new Camera(Vector3(-500.0f, -500.5f, -500.0f),
         Vector3(0.0f, 0.5f, 0.0f),
         Vector3(0.0f, 1.0f, 0.0f),
-        Math::Radians(60.0f),
+        Math::Radians(80.0f),
         windowWidth / (float)windowHeight,
         0.1f,
-        500.0f);
+        600.0f);
 
     SDL_GPUTextureCreateInfo msaaTextureCreateInfo = SDL_GPUTextureCreateInfo();
     msaaTextureCreateInfo.type = SDL_GPU_TEXTURETYPE_2D;

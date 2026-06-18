@@ -66,10 +66,11 @@ void Image::StageLayer(SDL_GPUDevice* device, SDL_GPUTransferBuffer* transferBuf
     
     // 3. Pointer math: Start of the layer in the vector
     // pixels.data() returns Uint64*, so the offset should be in elements, not bytes
-    const Uint64* sourcePtr = this->pixels.data() + (layer * elementsPerLayer);
+    const Uint32* sourcePtr = this->pixels.data() + (layer * elementsPerLayer);
     
     // 4. Copy the data
-    SDL_memcpy(reinterpret_cast<Uint8*>(transferData) + offset, sourcePtr, elementsPerLayer);
+    SDL_memcpy(reinterpret_cast<Uint8*>(transferData) + offset, sourcePtr,
+        elementsPerLayer * sizeof(Uint32));
     
     SDL_UnmapGPUTransferBuffer(device, transferBuffer);
 }

@@ -23,8 +23,8 @@ struct VertexData
 {
     NLMISC::CVector position;
     NLMISC::CVector normal;
-    float mainUV[3];
-    uint32 tileIndexes[3];
+    uint tileLayer;
+    float mainUV[2];
     NLMISC::CUV tileUV0;
     NLMISC::CUV tileUV1;
     NLMISC::CUV tileUV2;
@@ -58,9 +58,7 @@ private:
     SDL_GPUGraphicsPipeline* landscapePipeline;
 
     std::vector<std::array<float, 3>> tileBitmaps;
-    Image* tileImages;
-    Image* tileIdMaps[3];
-    SDL_GPUSampler* samplers[4];
+    SDL_GPUSampler* samplers[1];
 
     void parsePath(std::string& path);
 
@@ -72,13 +70,7 @@ private:
         const std::string& zoneSearchDirectory);
     void loadTileBank(const std::string& bankFilePath);
 
-    uint8 getPatchTileIndex(const NL3D::CPatch& patch, const uint8 s, const uint8 t);
-    NLMISC::CUV tileOrientation(NLMISC::CUV in, uint8 orientation);
-    NLMISC::CUV tileUV(const NLMISC::CUV &in, uint8 orientation, bool is256, uint8 uvOff);
-
-    void drawImage(Image& target, int x, int y, Image& part);
-    void createTileIdMap(Image& image, int width, int height);
-    void drawTileInfoMap(const NL3D::CPatch& patch, Image& image, uint8 layer);
+    NLMISC::CUV tileUV(const NLMISC::CUV &in, uint8 orientation, bool is256, uint8 uvOff, float scale);
     
     void buildFaces(sint zoneId, sint patchIndex);
 
@@ -89,6 +81,8 @@ private:
 public:
     LandscapeManager(SDL_GPUDevice* device, const std::string& cfgFile);
     ~LandscapeManager();
+
+    Image* tileImages = nullptr;
 
     bool Load(const std::string& path);
     

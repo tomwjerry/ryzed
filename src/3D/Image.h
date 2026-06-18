@@ -19,7 +19,7 @@ public:
     Uint32 component;
     Uint32 layers = 1;
     SDL_GPUTextureType type = SDL_GPU_TEXTURETYPE_2D;
-    std::vector<Uint64> pixels;
+    std::vector<Uint32> pixels;
     Uint32 num_levels = 1;
     SDL_GPUTexture* texture;
 

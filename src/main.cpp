@@ -196,6 +196,14 @@ int main(int, char**)
 
         ryzUI->Render();
 
+        /*if (landscapeManager->tileImages != nullptr)
+        {
+            ImGui::Begin("This is Sparta");
+            ImGui::Image((ImTextureID)(intptr_t)landscapeManager->tileImages->texture,
+                ImVec2((float)4096, (float)4096));
+            ImGui::End();
+        }*/
+
         // Rendering
         ImGui::Render();
         ImDrawData* draw_data = ImGui::GetDrawData();

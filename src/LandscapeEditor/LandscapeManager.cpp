@@ -40,10 +40,6 @@ LandscapeManager::LandscapeManager(SDL_GPUDevice* device, const std::string& cfg
     this->landscapeModel =
         (NL3D::CLandscapeModel*)NL3D::CNELU::Scene->createModel(NL3D::LandscapeModelId);*/
     this->landscape = new NL3D::CLandscape();
-    
-    this->tileIdMaps[0] = new Image();
-    this->tileIdMaps[1] = new Image();
-    this->tileIdMaps[2] = new Image();
 
     this->device = device;
 
@@ -85,14 +81,9 @@ LandscapeManager::LandscapeManager(SDL_GPUDevice* device, const std::string& cfg
 
 LandscapeManager::~LandscapeManager()
 {
-    this->tileIdMaps[0]->Release(this->device);
-    this->tileIdMaps[1]->Release(this->device);
-    this->tileIdMaps[2]->Release(this->device);
-
+    this->tileImages->Release(this->device);
+    delete this->tileImages;
     delete this->tileBank;
-    delete this->tileIdMaps[0];
-    delete this->tileIdMaps[1];
-    delete this->tileIdMaps[2];
 }
 
 bool LandscapeManager::Load(const std::string& path)
@@ -143,7 +134,6 @@ bool LandscapeManager::LoadZone(const std::string& path)
         return false;
     }
     
-    NLMISC::CAABBox bbox;
     NL3D::CZone loadingZone = NL3D::CZone();
     loadingZone.serial(zoneFile);
     zoneFile.close();
@@ -164,11 +154,6 @@ bool LandscapeManager::LoadZone(const std::string& path)
 
     const sint zoneX(zoneId & 255);
     const sint zoneY(zoneId >> 8);
-    NLMISC::CVector zoneOffset(160.0f * zoneX, -160.0f * zoneY, 0.0f);
-
-    this->createTileIdMap(*this->tileIdMaps[0], TILE_ID_MAP_SIZE, TILE_ID_MAP_SIZE);
-    this->createTileIdMap(*this->tileIdMaps[1], TILE_ID_MAP_SIZE, TILE_ID_MAP_SIZE);
-    this->createTileIdMap(*this->tileIdMaps[2], TILE_ID_MAP_SIZE, TILE_ID_MAP_SIZE);
 
     for (sint patchIndex = 0; patchIndex < loadingZone.getNumPatchs(); patchIndex++)
     {
@@ -219,40 +204,40 @@ bool LandscapeManager::LoadShaders(SDL_Window* window)
             SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3,
             sizeof(float) * 3
         },
-        // Main UV
+        // Layer indexes
         {
             2,
             0,
-            SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2,
+            SDL_GPU_VERTEXELEMENTFORMAT_INT,
             sizeof(float) * 6
         },
-        // Tile Index 0
+        // Main UV
         {
             3,
             0,
-            SDL_GPU_VERTEXELEMENTFORMAT_INT3,
-            sizeof(float) * 8
+            SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2,
+            sizeof(float) * 6 + sizeof(uint32)
         },
         // 4: Tile 0 UV
         {
             4,
             0,
             SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2,
-            sizeof(float) * 8 + sizeof(uint32) * 3
+            sizeof(float) * 8 + sizeof(uint32)
         },
         // 5: Tile 1 UV
         {
             5,
             0,
             SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2,
-            sizeof(float) * 10 + sizeof(uint32) * 3
+            sizeof(float) * 10 + sizeof(uint32)
         },
         // 6: Tile 2 UV
         {
             6,
             0,
             SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2,
-            sizeof(float) * 12 + sizeof(uint32) * 3
+            sizeof(float) * 12 + sizeof(uint32)
         }
     };
 
@@ -310,29 +295,10 @@ bool LandscapeManager::LoadShaders(SDL_Window* window)
 
 bool LandscapeManager::PrepareRender()
 {
-    SDL_GPUTransferBufferCreateInfo transferInfo;
-    transferInfo.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
-    transferInfo.size = 256 * 256 * 3 * 4;
-    SDL_GPUTransferBuffer* transferBuffer =
-        SDL_CreateGPUTransferBuffer(this->device, &transferInfo);
-
-    Uint32 texTransferOffset = 0;
-    this->tileIdMaps[0]->Stage(this->device, transferBuffer, texTransferOffset);
-    texTransferOffset = this->tileIdMaps[0]->total_byte_count();
-    this->tileIdMaps[1]->Stage(this->device, transferBuffer, texTransferOffset);
-    texTransferOffset += this->tileIdMaps[1]->total_byte_count();
-    this->tileIdMaps[2]->Stage(this->device, transferBuffer, texTransferOffset);
-
     SDL_GPUCommandBuffer* cmd = SDL_AcquireGPUCommandBuffer(this->device);
     SDL_GPUCopyPass* copyPass = SDL_BeginGPUCopyPass(cmd);
 
-    texTransferOffset = 0;
-    this->tileIdMaps[0]->Upload(this->device, copyPass, transferBuffer, texTransferOffset);
-    texTransferOffset = this->tileIdMaps[0]->total_byte_count();
-    this->tileIdMaps[1]->Upload(this->device, copyPass, transferBuffer, texTransferOffset);
-    texTransferOffset = this->tileIdMaps[1]->total_byte_count();
-    this->tileIdMaps[2]->Upload(this->device, copyPass, transferBuffer, texTransferOffset);
-
+    SDL_GPUTransferBufferCreateInfo transferInfo;
     transferInfo.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
     transferInfo.size = this->tileImages->layers * 4096 * 4096 * 4;
     SDL_GPUTransferBuffer* arrTransfer =
@@ -347,8 +313,7 @@ bool LandscapeManager::PrepareRender()
 
     SDL_EndGPUCopyPass(copyPass);
     SDL_SubmitGPUCommandBuffer(cmd);
-
-    SDL_ReleaseGPUTransferBuffer(this->device, transferBuffer);
+    SDL_ReleaseGPUTransferBuffer(this->device, arrTransfer);
 
     this->createBuffer(this->vertices.data(),
         this->vertices.size() * sizeof(VertexData),
@@ -369,9 +334,6 @@ bool LandscapeManager::PrepareRender()
     //samplerCreateInfo.max_lod = 200.0f;
     //samplerCreateInfo.enable_anisotropy = true;
     this->samplers[0] = SDL_CreateGPUSampler(this->device, &samplerCreateInfo);
-    this->samplers[1] = SDL_CreateGPUSampler(this->device, &samplerCreateInfo);
-    this->samplers[2] = SDL_CreateGPUSampler(this->device, &samplerCreateInfo);
-    this->samplers[3] = SDL_CreateGPUSampler(this->device, &samplerCreateInfo);
 
     this->ready = true;
     
@@ -411,25 +373,17 @@ bool LandscapeManager::Render(SDL_GPURenderPass* renderPass,
     vertexBufferBindings[0].offset = 0;
     SDL_BindGPUVertexBuffers(renderPass, 0, vertexBufferBindings, 1); // Vertex buffer size!
     
-    SDL_GPUTextureSamplerBinding textureSamplerBindings[4];
+    SDL_GPUTextureSamplerBinding textureSamplerBindings[1];
     textureSamplerBindings[0] = SDL_GPUTextureSamplerBinding();
-    textureSamplerBindings[0].texture = this->tileIdMaps[0]->texture;
+    textureSamplerBindings[0].texture = this->tileImages->texture;
     textureSamplerBindings[0].sampler = this->samplers[0];
-    textureSamplerBindings[1] = SDL_GPUTextureSamplerBinding();
-    textureSamplerBindings[1].texture = this->tileIdMaps[1]->texture;
-    textureSamplerBindings[1].sampler = this->samplers[1];
-    textureSamplerBindings[2] = SDL_GPUTextureSamplerBinding();
-    textureSamplerBindings[2].texture = this->tileIdMaps[2]->texture;
-    textureSamplerBindings[2].sampler = this->samplers[2];
-    textureSamplerBindings[3].texture = this->tileImages->texture;
-    textureSamplerBindings[3].sampler = this->samplers[3];
 
     SDL_GPUBufferBinding indexBufferBinding = SDL_GPUBufferBinding();
     indexBufferBinding.buffer = this->indexBuffer;
     indexBufferBinding.offset = 0;
     SDL_BindGPUIndexBuffer(renderPass, &indexBufferBinding,
         SDL_GPU_INDEXELEMENTSIZE_32BIT);
-    SDL_BindGPUFragmentSamplers(renderPass, 0, textureSamplerBindings, 4);
+    SDL_BindGPUFragmentSamplers(renderPass, 0, textureSamplerBindings, 1);
     SDL_DrawGPUIndexedPrimitives(renderPass, this->indexes.size(), 1, 0, 0, 0);
 
     return true;
@@ -645,12 +599,12 @@ void LandscapeManager::loadTileBank(const std::string& bankFilePath)
 
             offsetx++;
             
-            if (offsetx > 31)
+            if (offsetx > 30)
             {
                 offsetx = 0;
                 offsety++;
 
-                if (offsety > 31)
+                if (offsety > 30)
                 {
                     offsety = 0;
                     layer++;
@@ -692,12 +646,12 @@ void LandscapeManager::loadTileBank(const std::string& bankFilePath)
             }
 
             offsetx++;
-            if (offsetx > 15)
+            if (offsetx > 14)
             {
                 offsetx = 0;
                 offsety++;
 
-                if (offsety > 15)
+                if (offsety > 14)
                 {
                     offsety = 0;
                     layer++;
@@ -722,30 +676,8 @@ void LandscapeManager::loadTileBank(const std::string& bankFilePath)
     }
 }
 
-uint8 LandscapeManager::getPatchTileIndex(const NL3D::CPatch& patch, const uint8 s, const uint8 t)
-{
-    return t * patch.getOrderS() + s;
-}
-
-// check CTessFace::initTileUvRGBA for correct calculation
-NLMISC::CUV LandscapeManager::tileOrientation(NLMISC::CUV in, uint8 orientation)
-{
-    switch (orientation)
-    {
-    default:
-    case 0:
-        return { in.U, in.V };
-    case 1:
-        return { 1 - in.V, in.U };
-    case 2:
-        return { 1 - in.U, 1 - in.V };
-    case 3:
-        return { in.V, 1 - in.U };
-    }
-}
-
 NLMISC::CUV LandscapeManager::tileUV(const NLMISC::CUV &in, uint8 orientation,
-    bool is256, uint8 uvOff)
+    bool is256, uint8 uvOff, float scale)
 {
     NLMISC::CUV out(in);
     if (is256)
@@ -775,81 +707,23 @@ NLMISC::CUV LandscapeManager::tileUV(const NLMISC::CUV &in, uint8 orientation,
         hBiasZ = NL3D::CLandscapeGlobals::TilePixelScale128;
     }
 
-    hBiasXY = 0.0f;
-    hBiasZ = 1.0f;
-
     // Scale the UV.
     out.U *= hBiasZ;
     out.V *= hBiasZ;
     out.U += hBiasXY;
     out.V += hBiasXY;
+    out.U *= scale;
+    out.V *= scale;
 
     return out;
 }
 
-void LandscapeManager::drawImage(Image& target, int x, int y, Image& part)
-{
-    for (int iy = y; iy < target.height && iy < part.height; iy++)
-    {
-        for (int ix = x; ix < target.width && ix < part.width; ix++)
-        {
-            target.pixels[ix * iy * target.width] =
-                part.pixels[ix - x + (iy - y) * part.width];
-        }
-    }
-}
-
-void LandscapeManager::createTileIdMap(Image& image, int width, int height)
-{
-    image.width = width;
-    image.height = height;
-    image.component = 8;
-    image.Prepare(this->device);
-
-    for (int y = 0; y < height; y++)
-    {
-        for (int x = 0; x < width; x++)
-        {
-            image.pixels[y * width + x] =
-                (static_cast<Uint64>(NL_TILE_ELM_LAYER_EMPTY) << 48) |
-                (static_cast<Uint64>(0) << 32) |
-                (static_cast<Uint64>(0) << 16) |
-                static_cast<Uint64>(NL_TILE_ELM_LAYER_EMPTY);
-        }
-    }
-}
-
-void LandscapeManager::drawTileInfoMap(
-    const NL3D::CPatch& patch, Image& image, uint8 layer)
-{
-    const auto &tiles = patch.Tiles;
-    int w = patch.getOrderT();
-
-    for (auto y = 0; y < w; y++)
-    {
-        for (auto x = 0; x < patch.getOrderS(); x++)
-        {
-            auto tileIndex = this->getPatchTileIndex(patch, x, y);
-            const auto& tile = tiles[tileIndex];
-            const auto orientation = tile.getTileOrient(layer);
-            const auto tileId = tile.Tile[layer];
-            uint8 rotAlpha = 0;
-            if (tileId != NL_TILE_ELM_LAYER_EMPTY)
-            {
-                rotAlpha = this->tileBank->getTile(tileId)->getRotAlpha();
-            }
-            image.pixels[y * w + x] =
-                (static_cast<Uint64>(tileId) << 48) |
-                (static_cast<Uint64>(orientation) << 32) |
-                (static_cast<Uint64>(rotAlpha) << 16) |
-                static_cast<Uint64>(NL_TILE_ELM_LAYER_EMPTY);
-        }
-    }
-}
-
 void LandscapeManager::buildFaces(sint zoneId, sint patch)
 {
-    NLMISC::CUV A(0, 0), B(0, 1), C(1, 1), D(1, 0);
+    NLMISC::CUV A(0, 0);
+    NLMISC::CUV B(0, 1);
+    NLMISC::CUV C(1, 1);
+    NLMISC::CUV D(1, 0);
     NL3D::CZone *pZone = this->landscape->getZone(zoneId); //this->landscapeModel->Landscape.getZone(zoneId);
 
     // Then trace all patch.
@@ -870,23 +744,15 @@ void LandscapeManager::buildFaces(sint zoneId, sint patch)
     float OOS = 1.0f / ordS;
     float OOT = 1.0f / ordT;
 
-    uint16 offset_x(patchOffset % TILE_ID_MAP_SIZE);
-    uint16 offset_y((patchOffset / TILE_ID_MAP_SIZE) * PATCH_SIZE);
-    Image tileInfoMapPatch;
-    this->createTileIdMap(tileInfoMapPatch, PATCH_SIZE, PATCH_SIZE);
-    this->drawTileInfoMap(*pa, tileInfoMapPatch, 0);
-    this->drawImage(*this->tileIdMaps[0], offset_x, offset_y, tileInfoMapPatch);
-    this->drawTileInfoMap(*pa, tileInfoMapPatch, 1);
-    this->drawImage(*this->tileIdMaps[1], offset_x, offset_y, tileInfoMapPatch);
-    this->drawTileInfoMap(*pa, tileInfoMapPatch, 2);
-    this->drawImage(*this->tileIdMaps[2], offset_x, offset_y, tileInfoMapPatch);
+    uint16 offset_x(patchOffset % this->TILE_ID_MAP_SIZE);
+    uint16 offset_y((patchOffset / this->TILE_ID_MAP_SIZE) * this->PATCH_SIZE);
 
     for (y = 0; y < ordT; y++)
     {
         for (x = 0; x < ordS; x++)
         {
-            uint8 tileIndex = this->getPatchTileIndex(*pa, x, y);
-            const auto& tile = tiles[tileIndex];
+            uint8 tileIndex = y * ordS + x;
+            const NL3D::CTileElement& tile = tiles[tileIndex];
             if (tile.Tile[0] == NL_TILE_ELM_LAYER_EMPTY)
             {
                 nlwarning("tile base layer not defined patch %d x %d y %d tileIndex %d",
@@ -904,6 +770,14 @@ void LandscapeManager::buildFaces(sint zoneId, sint patch)
                 element.at(1),
                 element.at(2)
             };
+
+            const uint8 orientation = tile.getTileOrient(0);
+            uint8 rotAlpha = 0;
+            if (tile.Tile[0] != NL_TILE_ELM_LAYER_EMPTY)
+            {
+                rotAlpha = this->tileBank->getTile(tile.Tile[0])->getRotAlpha();
+            }
+
             float uvScale = 0;
             if (is256)
             {
@@ -925,39 +799,36 @@ void LandscapeManager::buildFaces(sint zoneId, sint patch)
             VertexData vd = VertexData();
             vd.position = NL3D::CVector(pa->computeContinousVertex(x * OOS, y * OOT));
             vd.normal = NL3D::CVector(bezierPatch.evalNormal(x * OOS, y * OOT));
-            vd.mainUV[0] = tileTextureInfo[0] + imageX * uvScale;
-            vd.mainUV[1] = tileTextureInfo[1] + imageY * uvScale;
-            vd.mainUV[2] = tileTextureInfo[2];
-            vd.tileIndexes[0] = tile.Tile[0];
-            vd.tileIndexes[1] = tile.Tile[1];
-            vd.tileIndexes[2] = tile.Tile[2];
-            vd.tileUV0 = this->tileUV(A, tile.getTileOrient(0), is256, uvOff);
-            vd.tileUV1 = this->tileUV(A, tile.getTileOrient(1), is256, uvOff);
-            vd.tileUV2 = this->tileUV(A, tile.getTileOrient(2), is256, uvOff);
+            vd.mainUV[0] = tileTextureInfo[0];
+            vd.mainUV[1] = tileTextureInfo[1];
+            vd.tileLayer = tileTextureInfo[2];
+            vd.tileUV0 = this->tileUV(A, tile.getTileOrient(0), is256, uvOff, uvScale);
+            vd.tileUV1 = this->tileUV(A, tile.getTileOrient(1), is256, uvOff, uvScale);
+            vd.tileUV2 = this->tileUV(A, tile.getTileOrient(2), is256, uvOff, uvScale);
             this->vertices.push_back(vd);
 
             vd.position = NL3D::CVector(pa->computeContinousVertex(x * OOS, (y + 1) * OOT));
             vd.normal = NL3D::CVector(bezierPatch.evalNormal(x * OOS, (y + 1) * OOT));
-            vd.mainUV[1] = tileTextureInfo[1] + (imageY + pixelOffset) * uvScale;
-            vd.tileUV0 = this->tileUV(B, tile.getTileOrient(0), is256, uvOff);
-            vd.tileUV1 = this->tileUV(B, tile.getTileOrient(1), is256, uvOff);
-            vd.tileUV2 = this->tileUV(B, tile.getTileOrient(2), is256, uvOff);
+            //vd.mainUV[1] = 0;
+            vd.tileUV0 = this->tileUV(B, tile.getTileOrient(0), is256, uvOff, uvScale);
+            vd.tileUV1 = this->tileUV(B, tile.getTileOrient(1), is256, uvOff, uvScale);
+            vd.tileUV2 = this->tileUV(B, tile.getTileOrient(2), is256, uvOff, uvScale);
             this->vertices.push_back(vd);
 
             vd.position = NL3D::CVector(pa->computeContinousVertex((x + 1) * OOS, (y + 1) * OOT));
             vd.normal = NL3D::CVector(bezierPatch.evalNormal((x + 1) * OOS, (y + 1) * OOT));
-            vd.mainUV[0] = tileTextureInfo[0] + (imageX + pixelOffset) * uvScale;
-            vd.tileUV0 = this->tileUV(C, tile.getTileOrient(0), is256, uvOff);
-            vd.tileUV1 = this->tileUV(C, tile.getTileOrient(1), is256, uvOff);
-            vd.tileUV2 = this->tileUV(C, tile.getTileOrient(2), is256, uvOff);
+            //vd.mainUV[0] = 0;
+            vd.tileUV0 = this->tileUV(C, tile.getTileOrient(0), is256, uvOff, uvScale);
+            vd.tileUV1 = this->tileUV(C, tile.getTileOrient(1), is256, uvOff, uvScale);
+            vd.tileUV2 = this->tileUV(C, tile.getTileOrient(2), is256, uvOff, uvScale);
             this->vertices.push_back(vd);
 
             vd.position = NL3D::CVector(pa->computeContinousVertex((x + 1) * OOS, y * OOT));
             vd.normal = NL3D::CVector(bezierPatch.evalNormal((x + 1) * OOS, y * OOT));
-            vd.mainUV[1] = tileTextureInfo[1] + imageY * uvScale;
-            vd.tileUV0 = this->tileUV(D, tile.getTileOrient(0), is256, uvOff);
-            vd.tileUV1 = this->tileUV(D, tile.getTileOrient(1), is256, uvOff);
-            vd.tileUV2 = this->tileUV(D, tile.getTileOrient(2), is256, uvOff);
+            //vd.mainUV[1] = 0;
+            vd.tileUV0 = this->tileUV(D, tile.getTileOrient(0), is256, uvOff, uvScale);
+            vd.tileUV1 = this->tileUV(D, tile.getTileOrient(1), is256, uvOff, uvScale);
+            vd.tileUV2 = this->tileUV(D, tile.getTileOrient(2), is256, uvOff, uvScale);
             this->vertices.push_back(vd);
         }
     }
